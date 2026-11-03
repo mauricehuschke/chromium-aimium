@@ -1046,6 +1046,7 @@ chromium-metrics-reviews@google.com.
   <int value="659389881" label="chrome://gpu/"/>
   <int value="660800062" label="chrome://webui-toolbar.top-chrome/"/>
   <int value="662045902" label="chrome://smb-share-dialog/"/>
+  <int value="676637337" label="chrome://aimium/"/>
   <int value="689991895" label="chrome://supervised-user-internals/"/>
   <int value="701883986" label="chrome://privacy-sandbox-dialog/"/>
   <int value="703814809" label="chrome://intro/"/>

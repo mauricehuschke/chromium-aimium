@@ -1,4 +1,20 @@
-# ![Logo](chrome/app/theme/chromium/product_logo_64.png) Chromium
+# Aimium
+
+Aimium is a Chromium-based desktop browser project for Windows, Linux and macOS.
+It is being developed around persistent website workspaces, user-selected AI
+connectors and reusable visual browser workflows.
+
+The current milestone is a **development foundation, not a production browser**.
+The native `chrome://aimium` entry point is feature-gated; AI connectors, website
+actions, the left sidebar and workflow execution are not implemented yet.
+
+Start with the [Aimium project guide](aimium/README.md),
+[architecture](aimium/docs/architecture.md) and
+[development instructions](aimium/docs/development.md).
+
+## Upstream Chromium
+
+![Chromium logo](chrome/app/theme/chromium/product_logo_64.png)
 
 Chromium is an open-source browser project that aims to build a safer, faster,
 and more stable way for all users to experience the web.

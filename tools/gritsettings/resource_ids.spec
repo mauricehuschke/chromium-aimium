@@ -216,6 +216,10 @@
     "META": {"sizes": {"includes": [10]}},
     "includes": [2755],
   },
+  "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/aimium/resources.grd": {
+    "META": {"sizes": {"includes": [10]}},
+    "includes": [2757],
+  },
   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/app_home/resources.grd": {
     "META": {"sizes": {"includes": [20]}},
     "includes": [2760],

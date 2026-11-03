@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aimium:contract:common:1",
+  "title": "Aimium common v1",
+  "description": "Shared shapes only; load all schemas into an offline registry keyed by $id. No remote retrieval is needed.",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+    },
+    "nullable_id": {
+      "anyOf": [
+        {
+          "$ref": "urn:aimium:contract:common:1#/$defs/id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ids": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:aimium:contract:common:1#/$defs/id"
+      },
+      "minItems": 0,
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "web_url": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "format": "uri",
+      "pattern": "^https?://",
+      "description": "Absolute HTTP(S) URL without embedded credentials. The concrete validator additionally checks authority syntax."
+    },
+    "origin": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "format": "uri",
+      "pattern": "^https?://",
+      "description": "Canonical ASCII/IDNA origin, without credentials, path, query, fragment, trailing slash, or default port. Checked by validate.py."
+    },
+    "origins": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:aimium:contract:common:1#/$defs/origin"
+      },
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "text",
+          "vision",
+          "tool_calling",
+          "structured_output",
+          "streaming",
+          "async_jobs"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 6,
+      "uniqueItems": true
+    },
+    "action_kind": {
+      "enum": [
+        "observe_page",
+        "click",
+        "fill",
+        "select",
+        "scroll",
+        "navigate",
+        "download"
+      ]
+    },
+    "model_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "connector_id": {
+          "$ref": "urn:aimium:contract:common:1#/$defs/id"
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "required_capabilities": {
+          "$ref": "urn:aimium:contract:common:1#/$defs/capabilities"
+        }
+      },
+      "required": [
+        "connector_id",
+        "model_id",
+        "required_capabilities"
+      ]
+    },
+    "workflow_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workflow_id": {
+          "$ref": "urn:aimium:contract:common:1#/$defs/id"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "workflow_id",
+        "version"
+      ]
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "url_equals",
+                "text_present",
+                "element_present"
+              ]
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "download_completed",
+                "viewport_changed"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aimium:contract:connector:1",
+  "title": "Aimium connector v1",
+  "description": "Connector configuration with an opaque local credential reference. HTTP is limited to loopback and endpoint query/fragment data is forbidden by validate.py. No credential value belongs in this document.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "connector_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "provider": {
+      "enum": [
+        "openai",
+        "openrouter",
+        "replicate",
+        "ollama",
+        "openai_compatible"
+      ]
+    },
+    "endpoint": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/web_url"
+    },
+    "authentication": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "none"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "secret_ref"
+            },
+            "secret_ref": {
+              "type": "string",
+              "pattern": "^secret:[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+            }
+          },
+          "required": [
+            "kind",
+            "secret_ref"
+          ]
+        }
+      ]
+    },
+    "data_destination": {
+      "enum": [
+        "local_device",
+        "remote_service",
+        "unknown"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "connector_id",
+    "name",
+    "provider",
+    "endpoint",
+    "authentication",
+    "data_destination"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "provider": {
+            "enum": [
+              "openai",
+              "openrouter",
+              "replicate"
+            ]
+          }
+        },
+        "required": [
+          "provider"
+        ]
+      },
+      "then": {
+        "properties": {
+          "authentication": {
+            "properties": {
+              "kind": {
+                "const": "secret_ref"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

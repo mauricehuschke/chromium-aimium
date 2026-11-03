@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "build_kind": "development",
+  "common_gn_args": {
+    "is_debug": false,
+    "is_component_build": false,
+    "is_official_build": false,
+    "is_chrome_branded": false,
+    "symbol_level": 1,
+    "use_remoteexec": false
+  },
+  "targets": {
+    "linux-x64": {
+      "host_os": "Linux",
+      "host_arch": "x64",
+      "target_os": "linux",
+      "target_cpu": "x64",
+      "gn_binary": "buildtools/linux64/gn",
+      "clang_binary": "third_party/llvm-build/Release+Asserts/bin/clang",
+      "executable": "chrome",
+      "runner_labels": ["self-hosted", "Linux", "X64", "aimium"]
+    },
+    "win-x64": {
+      "host_os": "Windows",
+      "host_arch": "x64",
+      "target_os": "win",
+      "target_cpu": "x64",
+      "gn_binary": "buildtools/win/gn.exe",
+      "clang_binary": "third_party/llvm-build/Release+Asserts/bin/clang-cl.exe",
+      "executable": "chrome.exe",
+      "runner_labels": ["self-hosted", "Windows", "X64", "aimium"]
+    },
+    "mac-arm64": {
+      "host_os": "Darwin",
+      "host_arch": "arm64",
+      "target_os": "mac",
+      "target_cpu": "arm64",
+      "gn_binary": "buildtools/mac/gn",
+      "clang_binary": "third_party/llvm-build/Release+Asserts/bin/clang",
+      "executable": "Chromium.app/Contents/MacOS/Chromium",
+      "runner_labels": ["self-hosted", "macOS", "ARM64", "aimium"]
+    },
+    "mac-x64": {
+      "host_os": "Darwin",
+      "host_arch": "x64",
+      "target_os": "mac",
+      "target_cpu": "x64",
+      "gn_binary": "buildtools/mac/gn",
+      "clang_binary": "third_party/llvm-build/Release+Asserts/bin/clang",
+      "executable": "Chromium.app/Contents/MacOS/Chromium",
+      "runner_labels": ["self-hosted", "macOS", "X64", "aimium"]
+    }
+  }
+}

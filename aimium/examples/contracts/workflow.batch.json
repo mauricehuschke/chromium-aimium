@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "workflow_id": "workflow-demo-batch",
+  "version": 1,
+  "name": "Bounded sample batch",
+  "browser_slot": "website",
+  "model_slots": {},
+  "input_keys": [
+    "items"
+  ],
+  "entry_node_id": "each",
+  "permissions": {
+    "allowed_origins": [
+      "https://portal.example.test"
+    ],
+    "allowed_actions": [
+      "observe_page"
+    ],
+    "max_actions": 20
+  },
+  "limits": {
+    "max_steps": 100,
+    "max_duration_seconds": 600
+  },
+  "nodes": [
+    {
+      "node_id": "each",
+      "type": "for_each",
+      "config": {
+        "items_key": "items",
+        "workflow": {
+          "workflow_id": "workflow-demo-item",
+          "version": 1
+        },
+        "max_iterations": 10,
+        "output_key": "results"
+      }
+    },
+    {
+      "node_id": "finish",
+      "type": "return_result",
+      "config": {
+        "input_keys": [
+          "results"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "each",
+      "port": "success",
+      "to": "finish"
+    }
+  ]
+}

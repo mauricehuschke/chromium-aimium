@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "connector_id": "connector-demo-local",
+  "name": "Local connector example",
+  "provider": "ollama",
+  "endpoint": "http://127.0.0.1:11434",
+  "authentication": {
+    "kind": "none"
+  },
+  "data_destination": "local_device"
+}

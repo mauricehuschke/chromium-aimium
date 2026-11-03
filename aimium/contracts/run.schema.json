@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aimium:contract:run:1",
+  "title": "Aimium run v1",
+  "description": "Local execution snapshot pinned to one workflow version. Unknown external action outcomes require needs_reconciliation. This schema is not an event store, scheduler, transition validator, or exactly-once execution guarantee.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "workflow": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/workflow_ref"
+    },
+    "workspace_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "profile_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "model_bindings": {
+      "type": "object",
+      "maxProperties": 16,
+      "propertyNames": {
+        "$ref": "urn:aimium:contract:common:1#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "urn:aimium:contract:common:1#/$defs/model_binding"
+      }
+    },
+    "status": {
+      "enum": [
+        "queued",
+        "running",
+        "waiting_for_page",
+        "waiting_for_login",
+        "waiting_for_input",
+        "paused",
+        "needs_reconciliation",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "current_node_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/nullable_id"
+    },
+    "completed_node_ids": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/ids"
+    },
+    "pending_action_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/nullable_id"
+    },
+    "last_action_outcome": {
+      "enum": [
+        "none",
+        "pending",
+        "confirmed",
+        "unknown"
+      ]
+    },
+    "event_sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$",
+      "description": "RFC3339 subset: uppercase T/Z, seconds, up to six fractional digits, explicit timezone, no leap seconds."
+    },
+    "updated_at": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$",
+      "description": "RFC3339 subset: uppercase T/Z, seconds, up to six fractional digits, explicit timezone, no leap seconds."
+    }
+  },
+  "required": [
+    "schema_version",
+    "run_id",
+    "workflow",
+    "workspace_id",
+    "profile_id",
+    "model_bindings",
+    "status",
+    "current_node_id",
+    "completed_node_ids",
+    "pending_action_id",
+    "last_action_outcome",
+    "event_sequence",
+    "created_at",
+    "updated_at"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "last_action_outcome": {
+            "enum": [
+              "pending",
+              "unknown"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "pending_action_id": {
+            "$ref": "urn:aimium:contract:common:1#/$defs/id"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "pending_action_id": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "last_action_outcome": {
+            "const": "unknown"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "needs_reconciliation"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "status": {
+            "not": {
+              "const": "needs_reconciliation"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "last_action_outcome": {
+            "const": "pending"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "enum": [
+              "running",
+              "waiting_for_page"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "queued",
+              "completed"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "current_node_id": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "queued"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "completed_node_ids": {
+            "maxItems": 0
+          },
+          "last_action_outcome": {
+            "const": "none"
+          }
+        }
+      }
+    }
+  ]
+}

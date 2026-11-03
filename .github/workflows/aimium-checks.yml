@@ -1,0 +1,46 @@
+name: Aimium foundation checks
+
+on:
+  push:
+    branches: [main, 'codex/**']
+    paths:
+      - 'aimium/**'
+      - '.github/workflows/aimium*.yml'
+  pull_request:
+    paths:
+      - 'aimium/**'
+      - '.github/workflows/aimium*.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aimium-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  foundation:
+    name: Foundation (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout Aimium foundation only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          sparse-checkout: |
+            aimium
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - name: Check contracts and build orchestration
+        run: python -m unittest discover -s aimium/tests -p 'test_*.py' -v
+      - name: Validate example contracts
+        run: python aimium/contracts/validate.py --examples
