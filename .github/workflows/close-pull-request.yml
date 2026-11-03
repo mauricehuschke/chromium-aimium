@@ -10,6 +10,8 @@ on:
 
 jobs:
   run:
+    # Chromium's mirror rejects GitHub PRs; downstream products use them.
+    if: github.repository == 'chromium/chromium'
     runs-on: ubuntu-latest
     steps:
     - uses: superbrothers/close-pull-request@v3
