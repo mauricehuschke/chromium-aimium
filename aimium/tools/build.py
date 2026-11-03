@@ -249,6 +249,10 @@ def _git_config_present(root, name):
 
 
 def make_plan(root, target, out, identity, tools, jobs=None, browser_tests=False):
+    # Both paths must use the same spelling before relative_to(): resolving
+    # just the output expands Windows short names and macOS /var symlinks.
+    root = root.resolve()
+    out = out.resolve()
     gn = tools["gn"] or str(root / target["gn_binary"])
     autoninja = tools["autoninja"] or "<depot_tools>/autoninja.py"
     relative = out.relative_to(root).as_posix()

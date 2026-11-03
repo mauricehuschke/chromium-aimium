@@ -24,7 +24,7 @@ class BuildFoundationTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        self.workspace = Path(self.directory.name)
+        self.workspace = Path(self.directory.name).resolve()
         self.root = self.workspace / "src"
         (self.root / "aimium/build").mkdir(parents=True)
         shutil.copyfile(REPO / "aimium/build/targets.json", self.root / "aimium/build/targets.json")
@@ -65,6 +65,39 @@ class BuildFoundationTest(unittest.TestCase):
     def test_unknown_target_is_rejected(self):
         with self.assertRaisesRegex(build.BuildError, "Unsupported target"):
             build.load_target(self.root, "freebsd-x64")
+
+    def test_plan_normalizes_source_and_output_aliases(self):
+        # Exercise equivalent path spellings on every host, without requiring
+        # Windows symlink privileges or a filesystem that exposes short names.
+        (self.workspace / "alias-parent").mkdir()
+        alias_root = self.workspace / "alias-parent" / ".." / "src"
+        alias_out = alias_root / "out/Aimium/linux-x64"
+        self.assertEqual(self.root, alias_root.resolve())
+        canonical_out = build.output_directory(alias_root, None, self.target)
+        expected = build.make_plan(self.root, self.target, self.out, self.identity,
+                                   self.tools, browser_tests=True)
+        for root in (self.root, alias_root):
+            for out in (canonical_out, alias_out):
+                with self.subTest(root=root, out=out):
+                    plan = build.make_plan(root, self.target, out, self.identity,
+                                           self.tools, browser_tests=True)
+                    self.assertEqual(expected, plan)
+        self.assertIn("out/Aimium/linux-x64", expected["commands"][0]["argv"])
+        self.assertFalse(self.out.exists())
+
+    def test_plan_normalizes_symlinked_source_aliases(self):
+        alias_root = self.workspace / "src-alias"
+        try:
+            alias_root.symlink_to(self.root, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("Creating symlinks requires platform privileges.")
+        out = build.output_directory(alias_root, None, self.target)
+        expected = build.make_plan(self.root, self.target, self.out, self.identity,
+                                   self.tools, browser_tests=True)
+        actual = build.make_plan(alias_root, self.target, out, self.identity,
+                                 self.tools, browser_tests=True)
+        self.assertEqual(expected, actual)
+        self.assertFalse(out.exists())
 
     def test_unsupported_host_is_rejected(self):
         result = self.inspect(host="FreeBSD")
@@ -181,12 +214,12 @@ class BuildFoundationTest(unittest.TestCase):
         self.assertEqual("not_run", plan["native_tests"]["status"])
 
     def test_linux_ui_tests_use_vpython_and_explicit_xvfb(self):
-        self.tools["vpython3"] = "/prepared/depot_tools/vpython3"
+        self.tools["vpython3"] = str(self.workspace / "depot_tools/vpython3")
         plan = build.make_plan(self.root, self.target, self.out, self.identity, self.tools, browser_tests=True)
         for step in ("list_aimium_tests", "run_aimium_tests"):
             command = next(item["argv"] for item in plan["commands"] if item["step"] == step)
             self.assertEqual(self.tools["vpython3"], command[0])
-            self.assertEqual(str(self.root / "testing/xvfb.py"), command[1])
+            self.assertEqual(str((self.root / "testing/xvfb.py").resolve()), command[1])
             self.assertIn("--use-xvfb", command)
 
     def test_linux_ui_test_preflight_rejects_missing_vpython(self):
