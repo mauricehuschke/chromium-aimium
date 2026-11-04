@@ -1,0 +1,92 @@
+name: Aimium native development build
+
+# This never runs automatically on push/PR/schedule. It requires dedicated,
+# already provisioned runners. Provisioning/syncing the source is intentional
+# operator work; this workflow never resets or replaces a working checkout.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Native host and CPU to build
+        type: choice
+        required: true
+        default: linux-x64
+        options: [linux-x64, win-x64, mac-arm64, mac-x64]
+      jobs:
+        description: Compiler parallelism (size for available RAM)
+        type: string
+        required: true
+        default: '8'
+      min_free_gib:
+        description: Minimum free build volume space in GiB
+        type: string
+        required: true
+        default: '100'
+      browser_tests:
+        description: Also build browser_tests and run only AimiumUI* tests
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# A prepared checkout must never be shared by two concurrent compilations.
+concurrency:
+  group: aimium-native-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  native:
+    # Repository owner explicitly enables this variable after provisioning.
+    # Standard GitHub-hosted runners do not have the storage/toolchain assumed.
+    if: ${{ vars.AIMIUM_NATIVE_BUILDS_ENABLED == 'true' }}
+    runs-on: ${{ fromJSON(inputs.target == 'win-x64' && '["self-hosted","Windows","X64","aimium"]' || inputs.target == 'mac-arm64' && '["self-hosted","macOS","ARM64","aimium"]' || inputs.target == 'mac-x64' && '["self-hosted","macOS","X64","aimium"]' || '["self-hosted","Linux","X64","aimium"]') }}
+    timeout-minutes: 720
+    env:
+      AIMIUM_EXPECTED_COMMIT: ${{ github.sha }}
+      AIMIUM_TARGET: ${{ inputs.target }}
+      AIMIUM_JOBS: ${{ inputs.jobs }}
+      AIMIUM_MIN_FREE_GIB: ${{ inputs.min_free_gib }}
+      AIMIUM_BROWSER_TESTS: ${{ inputs.browser_tests }}
+    steps:
+      - name: Verify prepared source and build
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          import sys
+
+          if sys.version_info < (3, 11):
+              raise SystemExit("Runner Python must be 3.11 or newer.")
+          configured = os.environ.get("AIMIUM_CHROMIUM_SOURCE")
+          if not configured:
+              raise SystemExit("Set AIMIUM_CHROMIUM_SOURCE on this dedicated runner to the fully synced Chromium source root.")
+          source = Path(configured).resolve()
+          expected = os.environ["AIMIUM_EXPECTED_COMMIT"]
+          if not re.fullmatch(r"[0-9a-f]{40}", expected):
+              raise SystemExit("Expected a full source commit SHA.")
+          actual = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip()
+          if actual != expected:
+              raise SystemExit(f"Prepared source is {actual}; workflow selected {expected}. Prepare that revision and gclient dependencies explicitly; no checkout/reset is performed here.")
+          # Validate numeric user inputs before launching any source tool.
+          numbers = []
+          for name in ("AIMIUM_JOBS", "AIMIUM_MIN_FREE_GIB"):
+              value = os.environ[name]
+              if not value.isdecimal() or int(value) < 1:
+                  raise SystemExit(f"{name} must be a positive integer.")
+              numbers.append(str(int(value)))
+          dirty = subprocess.check_output(["git", "-C", str(source), "status", "--porcelain=v1", "--untracked-files=normal"], text=True)
+          if dirty:
+              raise SystemExit("Prepared source must be clean and committed. This workflow never resets it.")
+          command = [sys.executable, str(source / "aimium/tools/build.py"), "build",
+                     "--target", os.environ["AIMIUM_TARGET"], "--source-root", str(source),
+                     "--jobs", numbers[0], "--min-free-gib", numbers[1]]
+          if os.environ["AIMIUM_BROWSER_TESTS"] == "true":
+              command.append("--browser-tests")
+          result = subprocess.run(command, cwd=source, check=False)
+          if "GITHUB_STEP_SUMMARY" in os.environ:
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+                  summary.write("Aimium development build. The build receipt stays in the prepared checkout at `out/Aimium/<target>/aimium-build-manifest.json`. No packaging/signing or release validation is performed.\n")
+          raise SystemExit(result.returncode)

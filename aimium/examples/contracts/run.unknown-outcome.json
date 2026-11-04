@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "run_id": "run-demo-001",
+  "workflow": {
+    "workflow_id": "workflow-demo-task",
+    "version": 1
+  },
+  "workspace_id": "workspace-demo-portal",
+  "profile_id": "profile-demo-account",
+  "model_bindings": {
+    "assistant": {
+      "connector_id": "connector-demo-remote",
+      "model_id": "example/replace-with-supported-model",
+      "required_capabilities": [
+        "text",
+        "tool_calling"
+      ]
+    }
+  },
+  "status": "needs_reconciliation",
+  "current_node_id": "perform_action",
+  "completed_node_ids": [
+    "observe",
+    "plan"
+  ],
+  "pending_action_id": "action-demo-001",
+  "last_action_outcome": "unknown",
+  "event_sequence": 8,
+  "created_at": "2026-11-03T09:00:00Z",
+  "updated_at": "2026-11-03T09:00:20Z"
+}

@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "workflow_id": "workflow-demo-item",
+  "version": 1,
+  "name": "Observe once per sample item",
+  "browser_slot": "website",
+  "model_slots": {},
+  "input_keys": [
+    "item",
+    "index"
+  ],
+  "entry_node_id": "observe",
+  "permissions": {
+    "allowed_origins": [
+      "https://portal.example.test"
+    ],
+    "allowed_actions": [
+      "observe_page"
+    ],
+    "max_actions": 1
+  },
+  "limits": {
+    "max_steps": 3,
+    "max_duration_seconds": 30
+  },
+  "nodes": [
+    {
+      "node_id": "observe",
+      "type": "observe_page",
+      "config": {
+        "output_key": "page"
+      }
+    },
+    {
+      "node_id": "finish",
+      "type": "return_result",
+      "config": {
+        "input_keys": [
+          "item",
+          "index",
+          "page"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "observe",
+      "port": "success",
+      "to": "finish"
+    }
+  ]
+}

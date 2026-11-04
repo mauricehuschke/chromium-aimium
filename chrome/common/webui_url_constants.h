@@ -45,6 +45,9 @@ inline constexpr char kChromeUIActorInternalsHost[] = "actor-internals";
 inline constexpr char kChromeUIActorOverlayHost[] = "actor-overlay";
 inline constexpr char kChromeUIActorOverlayURL[] = "chrome://actor-overlay";
 inline constexpr char kChromeUIAddressesPath[] = "/addresses";
+#if !BUILDFLAG(IS_ANDROID)
+inline constexpr char kChromeUIAimiumHost[] = "aimium";
+#endif
 inline constexpr char kChromeUIAppIconHost[] = "app-icon";
 inline constexpr char kChromeUIAppIconURL[] = "chrome://app-icon/";
 inline constexpr char kChromeUIAppLauncherPageHost[] = "apps";

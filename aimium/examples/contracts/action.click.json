@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "action_id": "action-demo-001",
+  "run_id": "run-demo-001",
+  "workspace_id": "workspace-demo-portal",
+  "profile_id": "profile-demo-account",
+  "tab_id": "tab-demo-001",
+  "document_generation": 7,
+  "observation_id": "observation-demo-003",
+  "lease_generation": 2,
+  "origin": "https://portal.example.test",
+  "kind": "click",
+  "arguments": {},
+  "target": {
+    "element_id": "element-demo-complete",
+    "observation_id": "observation-demo-003"
+  },
+  "expectation": {
+    "kind": "text_present",
+    "value": "Sample task completed"
+  }
+}

@@ -33,6 +33,9 @@ base::span<const std::string_view> GetChromeUrlsForTest() {
 #endif
       "chrome://actor-internals",
       "chrome://actor-overlay",
+#if !BUILDFLAG(IS_ANDROID)
+      "chrome://aimium",
+#endif
       "chrome://autofill-ml-internals",
       "chrome://autofill-internals",
 

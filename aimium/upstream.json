@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "repository": "https://chromium.googlesource.com/chromium/src.git",
+  "commit": "c80042ad683c5620adc9760ec7b5950c80f9d9ce",
+  "version": "159.0.8142.0",
+  "channel": "development",
+  "source_ref": "refs/heads/main",
+  "imported_at": "2026-11-03",
+  "release_eligible": false
+}

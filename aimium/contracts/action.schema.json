@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aimium:contract:action:1",
+  "title": "Aimium action v1",
+  "description": "Runtime action-request shape, not an export template or grant of authority. Trusted browser state must enforce scope, leases, origin policy, deduplication, and element freshness before any execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "action_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "run_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "workspace_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "profile_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "tab_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "document_generation": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "observation_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "lease_generation": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "origin": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/origin"
+    },
+    "kind": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/action_kind"
+    },
+    "arguments": {
+      "type": "object"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "element_id": {
+          "$ref": "urn:aimium:contract:common:1#/$defs/id"
+        },
+        "observation_id": {
+          "$ref": "urn:aimium:contract:common:1#/$defs/id"
+        }
+      },
+      "required": [
+        "element_id",
+        "observation_id"
+      ]
+    },
+    "expectation": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/condition"
+    }
+  },
+  "required": [
+    "schema_version",
+    "action_id",
+    "run_id",
+    "workspace_id",
+    "profile_id",
+    "tab_id",
+    "document_generation",
+    "observation_id",
+    "lease_generation",
+    "origin",
+    "kind",
+    "arguments"
+  ],
+  "oneOf": [
+    {
+      "properties": {
+        "kind": {
+          "const": "observe_page"
+        },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {},
+          "required": []
+        }
+      },
+      "required": [
+        "kind",
+        "arguments"
+      ],
+      "not": {
+        "required": [
+          "target"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "click"
+        },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {},
+          "required": []
+        }
+      },
+      "required": [
+        "kind",
+        "arguments",
+        "expectation",
+        "target"
+      ]
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "fill"
+        },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 16384
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "arguments",
+        "expectation",
+        "target"
+      ]
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "select"
+        },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          },
+          "required": [
+            "value"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "arguments",
+        "expectation",
+        "target"
+      ]
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "scroll"
+        },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "delta_x": {
+              "type": "integer",
+              "minimum": -10000,
+              "maximum": 10000
+            },
+            "delta_y": {
+              "type": "integer",
+              "minimum": -10000,
+              "maximum": 10000
+            }
+          },
+          "required": [
+            "delta_x",
+            "delta_y"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "arguments",
+        "expectation"
+      ],
+      "not": {
+        "required": [
+          "target"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "navigate"
+        },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "$ref": "urn:aimium:contract:common:1#/$defs/web_url"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "arguments",
+        "expectation"
+      ],
+      "not": {
+        "required": [
+          "target"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "download"
+        },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "artifact_name": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+            }
+          },
+          "required": [
+            "artifact_name"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "arguments",
+        "expectation",
+        "target"
+      ]
+    }
+  ]
+}

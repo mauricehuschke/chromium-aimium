@@ -1,0 +1,580 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aimium:contract:workflow:1",
+  "title": "Aimium workflow v1",
+  "description": "Immutable workflow-version template with symbolic browser/model slots. Acyclic outer graph; repetition uses bounded for_each calls. Cross-reference, path, and graph checks are in validate.py. No JavaScript or arbitrary plugin nodes are accepted.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "workflow_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "browser_slot": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "model_slots": {
+      "type": "object",
+      "maxProperties": 16,
+      "propertyNames": {
+        "$ref": "urn:aimium:contract:common:1#/$defs/id"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "required_capabilities": {
+            "$ref": "urn:aimium:contract:common:1#/$defs/capabilities"
+          }
+        },
+        "required": [
+          "required_capabilities"
+        ]
+      }
+    },
+    "input_keys": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/ids"
+    },
+    "entry_node_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed_origins": {
+          "$ref": "urn:aimium:contract:common:1#/$defs/origins"
+        },
+        "allowed_actions": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:aimium:contract:common:1#/$defs/action_kind"
+          },
+          "minItems": 0,
+          "maxItems": 7,
+          "uniqueItems": true
+        },
+        "max_actions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "allowed_origins",
+        "allowed_actions",
+        "max_actions"
+      ]
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "max_duration_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 604800
+        }
+      },
+      "required": [
+        "max_steps",
+        "max_duration_seconds"
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "$ref": "urn:aimium:contract:common:1#/$defs/id"
+          },
+          "type": {
+            "enum": [
+              "observe_page",
+              "extract_data",
+              "ask_model",
+              "browser_action",
+              "assert_state",
+              "condition",
+              "for_each",
+              "call_workflow",
+              "wait_for_condition",
+              "delay",
+              "request_input",
+              "return_result"
+            ]
+          },
+          "config": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "node_id",
+          "type",
+          "config"
+        ],
+        "oneOf": [
+          {
+            "properties": {
+              "type": {
+                "const": "observe_page"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "output_key": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                  }
+                },
+                "required": [
+                  "output_key"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "extract_data"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "source_key": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                    },
+                    "minItems": 1,
+                    "maxItems": 256,
+                    "uniqueItems": true
+                  },
+                  "output_key": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                  }
+                },
+                "required": [
+                  "source_key",
+                  "fields",
+                  "output_key"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "ask_model"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "model_slot": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  },
+                  "input_keys": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/ids"
+                  },
+                  "output_key": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                  },
+                  "output_type": {
+                    "enum": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "object",
+                      "array"
+                    ]
+                  }
+                },
+                "required": [
+                  "model_slot",
+                  "prompt",
+                  "input_keys",
+                  "output_key",
+                  "output_type"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "browser_action"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/action_kind"
+                  },
+                  "arguments_key": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                  },
+                  "output_key": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                  }
+                },
+                "required": [
+                  "action",
+                  "arguments_key",
+                  "output_key"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "assert_state"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "condition": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/condition"
+                  }
+                },
+                "required": [
+                  "condition"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "condition"
+              },
+              "config": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "input_key": {
+                        "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                      },
+                      "operator": {
+                        "const": "is_true"
+                      }
+                    },
+                    "required": [
+                      "input_key",
+                      "operator"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "input_key": {
+                        "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                      },
+                      "operator": {
+                        "enum": [
+                          "equals",
+                          "not_equals"
+                        ]
+                      },
+                      "value": {
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "input_key",
+                      "operator",
+                      "value"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "for_each"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "items_key": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                  },
+                  "workflow": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/workflow_ref"
+                  },
+                  "max_iterations": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  },
+                  "output_key": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                  }
+                },
+                "required": [
+                  "items_key",
+                  "workflow",
+                  "max_iterations",
+                  "output_key"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "call_workflow"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "workflow": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/workflow_ref"
+                  },
+                  "input_keys": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/ids"
+                  },
+                  "output_key": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                  }
+                },
+                "required": [
+                  "workflow",
+                  "input_keys",
+                  "output_key"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "wait_for_condition"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "condition": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/condition"
+                  },
+                  "timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 86400
+                  }
+                },
+                "required": [
+                  "condition",
+                  "timeout_seconds"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "delay"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 604800
+                  }
+                },
+                "required": [
+                  "seconds"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "request_input"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  },
+                  "output_key": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/id"
+                  }
+                },
+                "required": [
+                  "prompt",
+                  "output_key"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "return_result"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "input_keys": {
+                    "$ref": "urn:aimium:contract:common:1#/$defs/ids"
+                  }
+                },
+                "required": [
+                  "input_keys"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "config"
+            ]
+          }
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 256
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "$ref": "urn:aimium:contract:common:1#/$defs/id"
+          },
+          "port": {
+            "enum": [
+              "success",
+              "error",
+              "true",
+              "false"
+            ]
+          },
+          "to": {
+            "$ref": "urn:aimium:contract:common:1#/$defs/id"
+          }
+        },
+        "required": [
+          "from",
+          "port",
+          "to"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 1024
+    }
+  },
+  "required": [
+    "schema_version",
+    "workflow_id",
+    "version",
+    "name",
+    "browser_slot",
+    "model_slots",
+    "input_keys",
+    "entry_node_id",
+    "permissions",
+    "limits",
+    "nodes",
+    "edges"
+  ]
+}

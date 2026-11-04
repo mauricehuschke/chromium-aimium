@@ -856,6 +856,7 @@ chromium-metrics-reviews@google.com.
   <variant name=".actor-overlay"/>
   <variant name=".add-supervision"/>
   <variant name=".ai-overlay-dialog"/>
+  <variant name=".aimium"/>
   <variant name=".app-disabled"/>
   <variant name=".app-install-dialog"/>
   <variant name=".app-service-internals"/>

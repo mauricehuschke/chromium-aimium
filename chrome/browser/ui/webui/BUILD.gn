@@ -116,6 +116,7 @@ source_set("configs") {
       "//chrome/browser/ui/lens",
       "//chrome/browser/ui/tabs/tab_group_home",
       "//chrome/browser/ui/webui/access_code_cast",
+      "//chrome/browser/ui/webui/aimium",
       "//chrome/browser/ui/webui/app_service_internals",
       "//chrome/browser/ui/webui/autofill_ml_internals",
       "//chrome/browser/ui/webui/color_pipeline_internals",

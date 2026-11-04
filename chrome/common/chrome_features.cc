@@ -19,6 +19,11 @@ namespace features {
 
 // All features in alphabetical order.
 
+#if !BUILDFLAG(IS_ANDROID)
+// Enables the chrome://aimium development entry point.
+BASE_FEATURE(kAimium, base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
+
 #if BUILDFLAG(IS_WIN)
 // When enabled, notifications from PWA's will use the PWA icon and name,
 // as long as the PWA is on the start menu.  b/40285965.

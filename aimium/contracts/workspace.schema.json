@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aimium:contract:workspace:1",
+  "title": "Aimium workspace v1",
+  "description": "Local workspace configuration. The Chromium profile identity is independent from the selected model binding. Not a portable workflow template or a cookie/profile export.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "workspace_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "profile_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "start_url": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/web_url"
+    },
+    "allowed_origins": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/origins"
+    },
+    "model_binding": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/model_binding"
+    }
+  },
+  "required": [
+    "schema_version",
+    "workspace_id",
+    "name",
+    "profile_id",
+    "start_url",
+    "allowed_origins",
+    "model_binding"
+  ]
+}
