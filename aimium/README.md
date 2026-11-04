@@ -1,8 +1,26 @@
 # Aimium
 
 Aimium is a Chromium-based desktop browser project for Windows, Linux and macOS.
-Its planned workspace combines a real browser tab with an AI context panel,
-multiple user-configured model connectors, and reusable visual workflows.
+Every planned product tab is a persistent pair: an agent/context area on the
+left and a real website or workflow view on the right. Multiple configurable
+model connectors and reusable local workflows are part of the product goal.
+
+## Project continuation / Codex handoff
+
+The owner clarified the vision and implementation priorities on 2026-11-04.
+Start with [the complete handoff](docs/codex-handoff.md),
+[product vision](docs/product-vision.md),
+[verified baseline](docs/current-state.md) and
+[phased development plan](docs/development-plan.md).
+The first three executable work packages are
+[AIM-001](docs/tasks/AIM-001-native-baseline.md),
+[AIM-002](docs/tasks/AIM-002-session-pairs.md) and
+[AIM-003](docs/tasks/AIM-003-workflows-and-monitor.md).
+Repository-wide agent guidance is in [AGENTS.md](../AGENTS.md).
+
+These files are a durable handoff, not evidence that a separate Codex/Work task
+has been started. The foundation remains on `codex/aimium-foundation` while its
+PR is open; verify current refs before continuing.
 
 ## Current milestone: P0 foundation
 
@@ -17,7 +35,7 @@ Included in this milestone:
   runs and browser actions, with executable validation of domain invariants.
 - Build planning and environment checks for the three desktop operating systems.
 - Lightweight foundation checks and a separately invoked native build path.
-- The architecture, implementation sequence and native validation requirements.
+- Architecture, implementation sequence and native validation requirements.
 
 The native WebUI is a foundation screen. It does not yet implement the proposed
 left sidebar, connector credentials, model requests, persistent workspaces,
@@ -27,8 +45,8 @@ future capabilities; passing their checks does not implement the capabilities.
 ## Development entry points
 
 - [Development and validation](docs/development.md)
-- [Architecture](docs/architecture.md)
-- [Roadmap and acceptance criteria](docs/roadmap.md)
+- [Technical architecture](docs/architecture.md)
+- [Roadmap index](docs/roadmap.md)
 - [Contracts](contracts/)
 - [Examples](examples/)
 - [Build tools](tools/)
@@ -39,15 +57,22 @@ by default. No provider key or external service is required for this screen.
 
 ## Product boundaries
 
-The workspace, browser identity, connector binding and workflow run are distinct
-objects. A model change must not change the user's website login. Browser
-actions target the same Chromium tab the user sees and must be validated against
-the current document and the run's authority.
+The workspace, browser identity, connector binding, workflow activation and
+workflow run are distinct objects. A model change must not change the user's
+website login. Browser actions target the same Chromium tab the user sees and
+must be validated against the current document and the run's authority.
 
-Workflow definitions are versioned. Runs retain their definition, model binding
-and observed outcomes. An interrupted external write with an unknown result is
-reconciled before another attempt. Local scheduling requires an available local
-runtime and an explicit policy for missed triggers.
+Closing a workspace tab does not delete saved definitions. Website, explorer and
+graph views belong to the same pair. Definitions are versioned; running processes
+retain their version, bindings and observed outcomes. Unknown external writes
+require reconciliation before another attempt.
+
+Browser control, monitoring and workflow execution are local. Initially Aimium
+must remain open; later a local headless runtime may work without a window.
+Inference is local or remote according to the explicitly chosen model. Optional
+subscription models, email services and future definition sync supplement the
+product without making local core functionality depend on a cloud account.
+See the confirmed vision for the full scope.
 
 These are implementation requirements, not claims about P0 runtime behavior.
 
