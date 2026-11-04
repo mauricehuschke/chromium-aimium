@@ -84,6 +84,20 @@ source identity, arguments, commands and outcome. It refuses to overwrite
 conflicting existing arguments. It does not fetch dependencies, install tools,
 change branches or prepare an installer.
 
+The dependency preflight checks real installation directories. In
+`.gclient_entries`, gclient also records GCS and CIPD identities as
+`destination:object-or-package`; their suffix is not a filesystem path. Several
+such records can share one destination. The preflight validates the destination
+and retains the separate source/tool markers. It does not repeat gclient's
+download hash checks or certify every dependency revision.
+
+When preparing a shallow fork checkout, retain enough ancestry for the pinned
+Chromium commit to be visible. `build/util/lastchange.py --json` must resolve the
+real upstream metadata instead of reporting a dummy version. Confirm the pinned
+commit is an ancestor of HEAD; fetch a bounded amount of additional history as
+needed. Do not fabricate `LASTCHANGE` data or change the product revision to make
+the hooks pass.
+
 Preflight checks catch common missing prerequisites; GN and the compiler still
 determine whether the selected dependencies and SDKs are compatible. A build
 builds the `chrome` target by default. Add `--browser-tests` to also build and

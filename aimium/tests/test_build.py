@@ -138,6 +138,63 @@ class BuildFoundationTest(unittest.TestCase):
         (self.root / "v8").mkdir()
         self.assertTrue(build.check_dependency_graph(self.root)[0])
 
+    def test_package_and_gcs_records_check_the_real_installation_destination(self):
+        entries = {
+            "src": "origin",
+            "src/fixtures:traces/example.gz-deadbeef": "gs://bucket/traces/example.gz-deadbeef",
+            "src/fixtures:traces/another:variant.gz-cafebabe": "gs://bucket/traces/another:variant.gz-cafebabe",
+            "src/tools:infra/tools/example/windows-amd64": "https://packages/infra/tools/example/windows-amd64@version",
+            "src/v8": "origin",
+        }
+        (self.workspace / ".gclient_entries").write_text(
+            "entries = " + repr(entries) + "\n", encoding="utf-8")
+        ok, detail = build.check_dependency_graph(self.root)
+        self.assertFalse(ok)
+        self.assertIn("Missing 3", detail)
+        for destination in ("fixtures", "tools"):
+            (self.root / destination).mkdir()
+        # Virtual records must not hide a missing ordinary Git dependency.
+        ok, detail = build.check_dependency_graph(self.root)
+        self.assertFalse(ok)
+        self.assertIn("src/v8", detail)
+        (self.root / "v8").mkdir()
+        self.assertTrue(build.check_dependency_graph(self.root)[0])
+        (self.root / "fixtures").rmdir()
+        self.assertFalse(build.check_dependency_graph(self.root)[0])
+        (self.root / "fixtures").write_bytes(b"not an installation directory")
+        self.assertFalse(build.check_dependency_graph(self.root)[0])
+
+    def test_virtual_dependency_destinations_cannot_escape_the_workspace(self):
+        for key in ("src/../outside:object", "src\\outside:object", "/src/outside:object",
+                    "C:/outside:object", "C:\\outside:object", ":object", "src/tools:"):
+            with self.subTest(key=key):
+                (self.workspace / ".gclient_entries").write_text(
+                    "entries = " + repr({"src": "origin", key: "gs://bucket/object"}) + "\n",
+                    encoding="utf-8")
+                ok, detail = build.check_dependency_graph(self.root)
+                self.assertFalse(ok)
+                self.assertIn("Invalid .gclient_entries", detail)
+
+    def test_dependency_destination_symlink_cannot_escape_workspace(self):
+        outside = self.workspace.parent / (self.workspace.name + "-dependency-outside")
+        outside.mkdir()
+        self.addCleanup(outside.rmdir)
+        try:
+            (self.root / "linked").symlink_to(outside, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("Creating symlinks requires platform privileges.")
+        (self.workspace / ".gclient_entries").write_text(
+            "entries = {'src': 'origin', 'src/linked:object': 'gs://bucket/object'}\n",
+            encoding="utf-8")
+        ok, detail = build.check_dependency_graph(self.root)
+        self.assertFalse(ok)
+        self.assertIn("outside the gclient workspace", detail)
+        (self.root / "linked").unlink()
+        (self.root / "linked").symlink_to("linked", target_is_directory=True)
+        ok, detail = build.check_dependency_graph(self.root)
+        self.assertFalse(ok)
+        self.assertIn("Invalid .gclient_entries", detail)
+
     def test_output_cannot_escape_checkout(self):
         for value in ("../elsewhere", "out/../../elsewhere", "out", str(self.workspace / "absolute")):
             with self.subTest(value=value), self.assertRaises(build.BuildError):

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import platform
 import re
 import shutil
@@ -152,21 +152,37 @@ def check_dependency_graph(root):
                 entries = ast.literal_eval(statement.value)
         if not isinstance(entries, dict) or root.name not in entries:
             raise ValueError(f"no entries dictionary for solution {root.name!r}")
-        relevant = []
+        relevant = set()
+        virtual_records = 0
         for key, value in entries.items():
             if not isinstance(key, str):
                 raise ValueError("non-string dependency path")
-            path_parts = PurePosixPath(key)
-            if path_parts.is_absolute() or ".." in path_parts.parts or "\\" in key:
+            # gclient names GCS/CIPD records "destination:object-or-package".
+            # Only the prefix is a local installation directory; the suffix
+            # can contain slashes and must never be interpreted as a path.
+            destination, separator, identifier = key.partition(":")
+            if not destination or (separator and not identifier):
+                raise ValueError("empty dependency destination or package/object identifier")
+            path_parts = PurePosixPath(destination)
+            if (path_parts.is_absolute() or PureWindowsPath(key).drive
+                    or ".." in path_parts.parts or "\\" in destination):
                 raise ValueError("dependency path escapes the gclient workspace")
-            if key.startswith(root.name + "/") and value is not None:
-                relevant.append(key)
+            if destination.startswith(root.name + "/") and value is not None:
+                try:
+                    resolved = (root.parent / destination).resolve()
+                except RuntimeError as exc:
+                    raise ValueError(f"dependency destination cannot be resolved: {exc}") from exc
+                if not resolved.is_relative_to(root.parent.resolve()):
+                    raise ValueError("dependency destination resolves outside the gclient workspace")
+                relevant.add(destination)
+                virtual_records += bool(separator)
         if not relevant:
             raise ValueError("no dependency entries for this solution")
-        missing = [key for key in relevant if not (root.parent / key).exists()]
+        missing = sorted(key for key in relevant if not (root.parent / key).is_dir())
         if missing:
-            return False, f"Missing {len(missing)} gclient dependency paths: {', '.join(missing[:8])}."
-        return True, f"{len(relevant)} recorded dependency paths exist; GN still validates their contents."
+            return False, f"Missing {len(missing)} gclient dependency destinations: {', '.join(missing[:8])}."
+        return True, (f"{len(relevant)} recorded dependency destinations exist "
+                      f"({virtual_records} package/object records); GN still validates their contents.")
     except (OSError, ValueError, SyntaxError) as exc:
         return False, f"Invalid .gclient_entries: {exc}"
 
