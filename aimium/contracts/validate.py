@@ -3,7 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Validate Aimium v1 contract shapes and selected product invariants.
+"""Validate Aimium contract shapes and selected product invariants.
 
 This is a reference validator for the concrete contracts in this directory,
 not a general JSON Schema interpreter and not a browser authorization service.
@@ -11,6 +11,7 @@ It has no network, browser, credential-store, or workflow execution access.
 """
 
 import argparse
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 import ipaddress
@@ -158,9 +159,9 @@ def _origin(value, path):
         _fail(path, f"must be a canonical origin without path: {canonical}")
 
 
-def _origins(value, path):
+def _origins(value, path, minimum=1):
     _array(value, path, 32)
-    if not value:
+    if len(value) < minimum:
         _fail(path, "must contain at least one origin")
     for index, origin in enumerate(value):
         _origin(origin, f"{path}[{index}]")
@@ -248,7 +249,7 @@ def validate_connector(document):
             _fail("$.authentication", "this provider requires a secret reference")
 
 
-def validate_workspace(document):
+def _validate_workspace_v1(document):
     _record(document, "$", {
         "schema_version", "workspace_id", "name", "profile_id", "start_url",
         "allowed_origins", "model_binding",
@@ -262,6 +263,48 @@ def validate_workspace(document):
     if start_origin not in document["allowed_origins"]:
         _fail("$.start_url", "origin is outside the workspace's agent scope")
     _binding(document["model_binding"], "$.model_binding")
+
+
+def _validate_workspace_v2(document):
+    _record(document, "$", {
+        "schema_version", "workspace_id", "name", "profile_id", "start_url",
+        "associated_origins", "allowed_origins", "model_binding",
+    })
+    for name in ("workspace_id", "profile_id"):
+        _id(document[name], f"$.{name}")
+    _text(document["name"], "$.name", 128)
+    _, start_origin = _web_url(document["start_url"], "$.start_url")
+    _origins(document["associated_origins"], "$.associated_origins")
+    if start_origin not in document["associated_origins"]:
+        _fail("$.start_url", "origin is outside the workspace's website associations")
+    _origins(document["allowed_origins"], "$.allowed_origins", minimum=0)
+    if document["model_binding"] is not None:
+        _binding(document["model_binding"], "$.model_binding")
+
+
+def validate_workspace(document):
+    """Dispatch only workspace versions; every other contract remains v1."""
+    if not isinstance(document, dict):
+        _fail("$", "must be an object")
+    if "schema_version" not in document:
+        _fail("$", "missing fields: schema_version")
+    _integer(document["schema_version"], "$.schema_version", 1, 2)
+    if document["schema_version"] == 1:
+        _validate_workspace_v1(document)
+    else:
+        _validate_workspace_v2(document)
+
+
+def upgrade_workspace(document):
+    """Return an independent v2 reference record; never resolve a profile."""
+    validate("workspace", document)
+    upgraded = deepcopy(document)
+    if upgraded["schema_version"] == 1:
+        _, start_origin = _web_url(upgraded["start_url"], "$.start_url")
+        upgraded["schema_version"] = 2
+        # Agent grants can include SSO origins; they are not site suggestions.
+        upgraded["associated_origins"] = [start_origin]
+    return upgraded
 
 
 def _node(node, path, model_slots, allowed_actions, current_workflow):

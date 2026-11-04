@@ -18,7 +18,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from aimium.contracts.validate import (  # noqa: E402
     ActionAuthority, ValidationError, load_document, validate,
-    validate_action_binding, validate_run_binding,
+    upgrade_workspace, validate_action_binding, validate_run_binding,
 )
 
 
@@ -104,6 +104,192 @@ class ContractTests(unittest.TestCase):
         self.workspace["start_url"] = "https://elsewhere.example.test/"
         with self.assertRaisesRegex(ValidationError, "agent scope"):
             validate("workspace", self.workspace)
+
+    def test_workspace_v1_keeps_its_original_strict_shape(self):
+        mutations = (
+            lambda doc: doc.update(model_binding=None),
+            lambda doc: doc.pop("model_binding"),
+            lambda doc: doc.update(associated_origins=doc["allowed_origins"][:]),
+            lambda doc: doc.update(allowed_origins=[]),
+        )
+        for index, mutate in enumerate(mutations):
+            with self.subTest(case=index):
+                document = deepcopy(self.workspace)
+                mutate(document)
+                with self.assertRaises(ValidationError):
+                    validate("workspace", document)
+
+    def test_workspace_v2_can_be_unconfigured_without_agent_permissions(self):
+        document = example("workspace.unconfigured.v2.json")
+        validate("workspace", document)
+        self.assertIsNone(document["model_binding"])
+        self.assertEqual([], document["allowed_origins"])
+        self.assertEqual(["https://portal.example.test"], document["associated_origins"])
+
+    def test_workspace_v2_model_binding_is_required_and_nullable(self):
+        document = upgrade_workspace(self.workspace)
+        document["model_binding"] = None
+        validate("workspace", document)
+        for binding in ({}, {"connector_id": "missing-fields"}, False, "none"):
+            with self.subTest(binding=binding):
+                document["model_binding"] = binding
+                with self.assertRaises(ValidationError):
+                    validate("workspace", document)
+        document.pop("model_binding")
+        with self.assertRaisesRegex(ValidationError, "missing fields: model_binding"):
+            validate("workspace", document)
+
+    def test_workspace_v2_start_requires_an_association_not_an_agent_grant(self):
+        document = upgrade_workspace(self.workspace)
+        document["allowed_origins"] = []
+        validate("workspace", document)
+        document["allowed_origins"] = self.workspace["allowed_origins"][:]
+        document["associated_origins"] = ["https://elsewhere.example.test"]
+        with self.assertRaisesRegex(ValidationError, "website associations"):
+            validate("workspace", document)
+        document["associated_origins"] = []
+        with self.assertRaisesRegex(ValidationError, "at least one origin"):
+            validate("workspace", document)
+
+    def test_workspace_v2_associations_and_authority_are_independent_sets(self):
+        document = upgrade_workspace(self.workspace)
+        document["allowed_origins"] = ["https://login.example.test"]
+        validate("workspace", document)
+        self.assertNotIn(document["allowed_origins"][0], document["associated_origins"])
+        self.assertNotIn(document["associated_origins"][0], document["allowed_origins"])
+
+    def test_workspace_v2_origin_lists_require_canonical_representations(self):
+        aliases = (
+            "https://portal.example.test/", "https://portal.example.test:443",
+            "https://portal.example.test/path", "https://PORTAL.example.test",
+            "https://[0:0:0:0:0:0:0:1]", "https://user:pass@portal.example.test",
+        )
+        for field in ("associated_origins", "allowed_origins"):
+            for origin in aliases:
+                with self.subTest(field=field, origin=origin):
+                    document = upgrade_workspace(self.workspace)
+                    document[field].append(origin)
+                    with self.assertRaises(ValidationError):
+                        validate("workspace", document)
+
+    def test_workspace_v2_origin_lists_are_unique_and_limited_to_32(self):
+        origins = ["https://portal.example.test"] + [
+            f"https://site-{index}.example.test" for index in range(31)]
+        for field in ("associated_origins", "allowed_origins"):
+            with self.subTest(field=field):
+                document = upgrade_workspace(self.workspace)
+                document[field] = origins[:]
+                validate("workspace", document)
+                document[field].append("https://overflow.example.test")
+                with self.assertRaisesRegex(ValidationError, "at most 32"):
+                    validate("workspace", document)
+                document[field] = origins[:2] + origins[:1]
+                with self.assertRaisesRegex(ValidationError, "duplicate origins"):
+                    validate("workspace", document)
+
+    def test_only_workspace_accepts_contract_version_two(self):
+        documents = {
+            "workspace": self.workspace, "workflow": self.workflow,
+            "run": self.run, "action": self.action,
+            "connector": example("connector.remote.json"),
+        }
+        for kind, original in documents.items():
+            versions = (True, False, 0, -1, 3, "2", 2.0, None)
+            if kind != "workspace":
+                versions += (2,)
+            for version in versions:
+                with self.subTest(kind=kind, version=version):
+                    document = deepcopy(original)
+                    document["schema_version"] = version
+                    with self.assertRaisesRegex(ValidationError, "integer"):
+                        validate(kind, document)
+
+    def test_workspace_upgrade_preserves_existing_identity_permissions_and_model(self):
+        self.workspace["start_url"] = "https://PORTAL.example.test:443/tasks"
+        self.workspace["allowed_origins"].insert(0, "https://login.example.test")
+        original = deepcopy(self.workspace)
+        upgraded = upgrade_workspace(self.workspace)
+        validate("workspace", upgraded)
+        self.assertEqual(2, upgraded["schema_version"])
+        for field in ("workspace_id", "name", "profile_id", "start_url",
+                      "allowed_origins", "model_binding"):
+            self.assertEqual(original[field], upgraded[field])
+        self.assertEqual(["https://portal.example.test"], upgraded["associated_origins"])
+        self.assertNotIn("https://login.example.test", upgraded["associated_origins"])
+        self.assertEqual(original, self.workspace)
+        upgraded["allowed_origins"].append("https://changed.example.test")
+        upgraded["model_binding"]["required_capabilities"].append("vision")
+        self.assertEqual(original, self.workspace)
+
+    def test_workspace_v2_upgrade_returns_an_independent_deep_copy(self):
+        document = upgrade_workspace(self.workspace)
+        document["associated_origins"].append("https://related.example.test")
+        original = deepcopy(document)
+        upgraded = upgrade_workspace(document)
+        self.assertEqual(document, upgraded)
+        self.assertIsNot(document, upgraded)
+        upgraded["associated_origins"].append("https://changed.example.test")
+        upgraded["allowed_origins"].clear()
+        upgraded["model_binding"]["required_capabilities"].clear()
+        self.assertEqual(original, document)
+
+    def test_workspace_upgrade_rejects_invalid_input_without_mutation(self):
+        invalid_documents = [deepcopy(self.workspace), upgrade_workspace(self.workspace)]
+        invalid_documents[0]["model_binding"] = None
+        invalid_documents[1]["associated_origins"] *= 2
+        unsupported = deepcopy(self.workspace)
+        unsupported["schema_version"] = 3
+        invalid_documents.append(unsupported)
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                original = deepcopy(document)
+                with self.assertRaises(ValidationError):
+                    upgrade_workspace(document)
+                self.assertEqual(original, document)
+
+    def test_workspace_v2_opaque_profile_id_survives_model_switches(self):
+        document = upgrade_workspace(self.workspace)
+        original_profile = document["profile_id"]
+        for binding in (None, {"connector_id": "another-connector",
+                              "model_id": "another-model", "required_capabilities": []}, None):
+            document["model_binding"] = binding
+            validate("workspace", document)
+            self.assertEqual(original_profile, document["profile_id"])
+        self.assertEqual("profile-demo-account", original_profile)
+        for profile in ("../personal-profile", "C:\\Users\\personal\\Default"):
+            with self.subTest(profile=profile):
+                document["profile_id"] = profile
+                with self.assertRaisesRegex(ValidationError, "opaque identifier"):
+                    validate("workspace", document)
+
+    def test_workspace_v2_associations_do_not_grant_workflow_scope(self):
+        document = upgrade_workspace(self.workspace)
+        document["model_binding"] = None
+        document["allowed_origins"] = []
+        validate("workspace", document)
+        with self.assertRaisesRegex(ValidationError, "exceed the workspace"):
+            validate_run_binding(self.run, self.workflow, document)
+
+    def test_workspace_v2_associations_do_not_grant_action_authority(self):
+        document = upgrade_workspace(self.workspace)
+        document["allowed_origins"] = []
+        authority = replace(self.authority, allowed_origins=frozenset(document["allowed_origins"]))
+        with self.assertRaisesRegex(ValidationError, "origin is outside"):
+            validate_action_binding(self.action, authority)
+        document["allowed_origins"] = self.workspace["allowed_origins"][:]
+        document["associated_origins"].append("https://related.example.test")
+        validate("workspace", document)
+        authority = replace(self.authority, allowed_origins=frozenset(document["allowed_origins"]))
+        self.action["kind"] = "navigate"
+        self.action.pop("target")
+        self.action["arguments"] = {"url": "https://related.example.test/tasks"}
+        with self.assertRaisesRegex(ValidationError, "destination is outside"):
+            validate_action_binding(self.action, authority)
+
+    def test_empty_origin_scope_is_not_enabled_for_workflows(self):
+        self.workflow["permissions"]["allowed_origins"] = []
+        with self.assertRaisesRegex(ValidationError, "at least one origin"):
+            validate("workflow", self.workflow)
 
     def test_origins_have_a_single_canonical_representation(self):
         for origin in ("https://portal.example.test/", "https://portal.example.test:443",

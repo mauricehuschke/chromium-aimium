@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aimium:contract:workspace:2",
+  "title": "Aimium workspace v2",
+  "description": "Local workspace configuration with separate website associations and explicit agent authority. A null model binding means no connector is configured. Not a profile export or native persistence implementation.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "workspace_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "profile_id": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/id"
+    },
+    "start_url": {
+      "$ref": "urn:aimium:contract:common:1#/$defs/web_url"
+    },
+    "associated_origins": {
+      "description": "Website associations for finding a saved workspace. These grant no agent or workflow authority. The start URL's canonical origin must be present, checked by the reference validator.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:aimium:contract:common:1#/$defs/origin"
+      },
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+    "allowed_origins": {
+      "description": "Explicit agent authority, independent from website associations. Empty means no origin is authorized.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:aimium:contract:common:1#/$defs/origin"
+      },
+      "minItems": 0,
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+    "model_binding": {
+      "anyOf": [
+        {
+          "$ref": "urn:aimium:contract:common:1#/$defs/model_binding"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "workspace_id",
+    "name",
+    "profile_id",
+    "start_url",
+    "associated_origins",
+    "allowed_origins",
+    "model_binding"
+  ]
+}

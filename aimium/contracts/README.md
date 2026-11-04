@@ -1,4 +1,4 @@
-# Aimium v1 contracts
+# Aimium contracts
 
 These files establish exchange formats and executable reference checks for the
 planned browser. They do not connect a model, open a profile, run a workflow or
@@ -11,19 +11,20 @@ contracts yet.
 | --- | --- | --- |
 | `connector.schema.json` | Provider, endpoint and opaque credential reference | Local configuration |
 | `workspace.schema.json` | Website, browser profile identity, agent origin scope and selected model | Local configuration |
+| `workspace.v2.schema.json` | Separate website associations and explicit agent scope; optional configured model | Local configuration |
 | `workflow.schema.json` | One immutable process version with symbolic browser/model slots | Reviewed reusable template |
 | `run.schema.json` | Execution snapshot pinned to a process version and resolved bindings | Local execution store |
 | `action.schema.json` | Request tied to one run, tab, document, observation and lease | Transient/local execution record |
 | `common.schema.json` | Shared structural definitions | Schema registry |
 
-The JSON Schemas use Draft 2020-12. Register the six files by their `$id` URNs in
+The JSON Schemas use Draft 2020-12. Register all schema files by their `$id` URNs in
 an offline schema registry. All `$ref` targets are contained in this set; schema
 validation does not need network retrieval. A standards-compliant schema
 validator remains the appropriate tool for generic JSON Schema validation.
 
 `validate.py` is a dependency-free validator for these specific contracts. It
-checks their concrete v1 shapes and selected domain invariants. It is **not a
-general JSON Schema implementation**. The test suite checks example behavior,
+checks their concrete versioned shapes and selected domain invariants. It is
+**not a general JSON Schema implementation**. The test suite checks example behavior,
 domain failures and offline reference integrity; it does not claim independent
 Draft 2020-12 metaschema conformance testing.
 
@@ -40,11 +41,47 @@ invalid command arguments. Duplicate object keys, nonfinite numbers and unknown
 fields are rejected rather than silently interpreted. Diagnostics identify the
 relevant field or graph node.
 
+## Workspace versions and reference upgrade
+
+Only the workspace contract has versions 1 and 2. All other contracts remain
+strictly v1; boolean, noninteger and unsupported versions are rejected. Workspace
+v1 keeps its original required model binding and nonempty agent-origin scope.
+The existing `urn:aimium:contract:workspace:1` schema is unchanged; v2 has its own
+`urn:aimium:contract:workspace:2` identifier and reuses common v1 field shapes.
+
+Workspace v2 requires `model_binding`, with `null` meaning that no connector is
+configured. It also requires two independent origin sets:
+
+- `associated_origins` identifies websites for finding a saved workspace. It has
+  1-32 unique canonical origins and must include the start URL's canonical origin.
+- `allowed_origins` declares explicit agent authority. It has 0-32 unique
+  canonical origins; an empty list grants no origin access.
+
+An association never grants agent or workflow authority. During v2 validation,
+neither set is inferred from, unioned with, or required to be a subset of the
+other. Run binding continues
+to compare workflow scope only with `allowed_origins`; trusted action authority
+must likewise use explicit grants. Start-origin containment and canonical-origin
+checks are domain checks in the reference validator, beyond generic schema shape.
+
+`upgrade_workspace(document)` validates a v1 or v2 input and returns an independent
+deep copy in v2 form. For v1 it preserves IDs, name, start URL, all existing agent
+grants and the configured model binding exactly. It initializes website
+associations from **only the canonical start-URL origin**: other grants, including
+SSO origins, do not automatically become website suggestions. Valid v2 records
+are copied without changing either origin set. Invalid inputs fail without
+mutation; unsupported versions are never reinterpreted.
+
+This function does not resolve or remap opaque profile IDs, open a profile,
+persist a workspace, or connect a provider. The Python validator and upgrade are
+reference/development tools. They are not a native store, production backend,
+browser authorization boundary, or evidence of migration/shutdown durability.
+
 ## Identity, configuration and credential references
 
 A workspace has its own `workspace_id`, a separate `profile_id`, and a
-`model_binding`. Changing `model_binding` must preserve `profile_id`. A future
-profile service must resolve that opaque ID to Chromium-owned browser state;
+`model_binding` (nullable in v2). Changing `model_binding` must preserve
+`profile_id`. A future profile service must resolve that opaque ID to Chromium-owned browser state;
 the field is not a filesystem path and does not create a profile today.
 
 A model binding names a connector, a provider-specific model ID and required

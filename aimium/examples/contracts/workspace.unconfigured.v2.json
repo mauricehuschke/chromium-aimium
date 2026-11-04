@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "workspace_id": "workspace-demo-unconfigured",
+  "name": "Example portal without a connector",
+  "profile_id": "profile-demo-separate-account",
+  "start_url": "https://portal.example.test/tasks",
+  "associated_origins": [
+    "https://portal.example.test"
+  ],
+  "allowed_origins": [],
+  "model_binding": null
+}
