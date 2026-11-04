@@ -57,6 +57,14 @@ checkout or discard their local changes to make a build work.
 
 Windows builds need the Windows toolchain described by the selected Chromium
 revision; public builds must use the appropriate locally installed toolchain.
+The Windows development target explicitly uses Ninja (`use_siso=false`) with
+local execution (`use_remoteexec=false`). The first native attempt found Siso
+rejecting an existing SDK directory named in GN's Windows depfile; Ninja is the
+supported fallback documented by depot_tools/autoninja.py. After an attempted
+Siso build, select a fresh output directory, for example
+`--out-dir out/Aimium/win-x64-ninja`. Do not edit generated depfiles or mix Siso's
+`.siso_deps` with Ninja state. Other platform targets retain their executor
+defaults; this Windows setting does not certify their builds.
 macOS builds require a Mac with Xcode and the selected SDK. Linux builds require
 the documented system dependencies. The imported Windows and Linux instructions
 call for at least 100 GB free disk space. A small hosted runner is not an adequate

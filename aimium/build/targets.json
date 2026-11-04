@@ -25,6 +25,7 @@
       "host_arch": "x64",
       "target_os": "win",
       "target_cpu": "x64",
+      "gn_args": {"use_siso": false},
       "gn_binary": "buildtools/win/gn.exe",
       "clang_binary": "third_party/llvm-build/Release+Asserts/bin/clang-cl.exe",
       "executable": "chrome.exe",

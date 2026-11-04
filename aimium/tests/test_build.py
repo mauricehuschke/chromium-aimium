@@ -60,6 +60,11 @@ class BuildFoundationTest(unittest.TestCase):
                 self.assertEqual(str(out / executable), plan["expected_executable"])
                 self.assertFalse(plan["release_eligible"])
                 self.assertNotIn("chrome_pgo_phase", plan["gn_args"])
+                self.assertFalse(plan["gn_args"]["use_remoteexec"])
+                if name == "win-x64":
+                    self.assertFalse(plan["gn_args"]["use_siso"])
+                else:
+                    self.assertNotIn("use_siso", plan["gn_args"])
                 self.assertFalse(out.exists())
 
     def test_unknown_target_is_rejected(self):

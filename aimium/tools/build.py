@@ -61,9 +61,9 @@ def load_target(root, name):
         raise BuildError(f"Unsupported target {name!r}; choose {', '.join(config['targets'])}.")
     target = dict(config["targets"][name])
     target["id"] = name
-    target["gn_args"] = dict(config["common_gn_args"],
-                             target_os=target["target_os"],
-                             target_cpu=target["target_cpu"])
+    arguments = dict(config["common_gn_args"], **target.get("gn_args", {}))
+    arguments.update(target_os=target["target_os"], target_cpu=target["target_cpu"])
+    target["gn_args"] = arguments
     return target
 
 
