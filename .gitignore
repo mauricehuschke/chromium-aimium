@@ -89,6 +89,9 @@ vs-chromium-project.txt
 # No trailing slash to also ignore symlinks, which is useful in conjunction with
 # gclient-new-workdir.
 .vscode
+!/.vscode/
+/.vscode/*
+!/.vscode/tasks.json
 .vscode-server
 # VS Code Bazel Extension
 /MODULE.bazel

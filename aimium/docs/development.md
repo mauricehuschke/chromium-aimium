@@ -1,263 +1,229 @@
-# Aimium development and validation
+# Aimium – lokale Entwicklung und Validierung
 
-## Baseline and status
+## Ausführungsregeln und Stand
 
-The initial fork contains Chromium `159.0.8142.0` at
-`c80042ad683c5620adc9760ec7b5950c80f9d9ce` from Chromium `main`.
-[The upstream manifest](../upstream.json) records this as a development snapshot
-with `release_eligible: false`. It must not be described as Stable.
+Prüfungen und Builds erfolgen lokal. GitHub Actions sind deaktiviert; vorhandene
+Workflowdefinitionen dürfen nicht als ausgeführte Prüfung gelten.
+Native Builds startet ausschließlich der Nutzer in VS Code. Agenten starten
+oder wiederholen keine nativen Builds, GN-Generierung, Compiler oder Linker.
+Leichte lokale Python- und Vertragsprüfungen bleiben für passende Änderungen
+verfügbar. Es gibt keinen automatischen Buildstart beim Öffnen des Projekts.
 
-P0 introduces a feature-gated WebUI entry point and development contracts/tools.
-It does not implement the agent browser product described in the architecture.
-In particular, the left sidebar and its browser-session/backend integration are
-not available yet.
+Die Foundation enthält die featuregeschützte WebUI und Entwicklungsverträge
+sowie Build-/Prüfwerkzeuge. Native Sitzungspaare, Agentenfläche,
+Connectoraufrufe und Workflow-Ausführung sind noch nicht implementiert.
+Ein vollständiger nativer Build mit beiden Aimium-Smokes und normaler Navigation
+ist noch nicht bestätigt; unterbrochene Kompilierung ist keine native Abnahme.
 
-## Two checkout types
+Die importierte Chromium-Basis ist `159.0.8142.0` mit Upstream-Commit
+`c80042ad683c5620adc9760ec7b5950c80f9d9ce`.
+[upstream.json](../upstream.json) kennzeichnet sie als Entwicklungsstand;
+sie ist keine verifizierte Stable-Basis. `release_eligible: false` bleibt bestehen.
 
-### Foundation-only checkout
+## Zwei Arten von Checkout
 
-A sparse or ordinary Git checkout is sufficient to edit Aimium documentation,
-contracts and Python tools and to run the lightweight foundation checks. Those
-checks do not compile Chromium, generate GRIT resources, typecheck WebUI with
-Chromium's toolchain or execute browser tests.
+Ein Sparse-Editingcheckout genügt zum Bearbeiten von Dokumentation,
+Datenverträgen und Python-Werkzeugen sowie für deren leichte lokale Prüfungen.
+Er kompiliert weder Chromium noch GRIT-/WebUI-Ressourcen und führt keine nativen
+Browsertests aus.
 
-From the repository root, with Python 3.11 or newer:
+Vom Git-Quellroot, mit Python 3.11 oder neuer:
 
 ```sh
-python aimium/contracts/validate.py --examples
-python -m unittest discover -s aimium/tests -v
-python aimium/tools/build.py plan --target linux-x64
+python3 aimium/contracts/validate.py --examples
+python3 -m unittest discover -s aimium/tests -p 'test_*.py' -v
+python3 aimium/tools/build.py plan --target linux-x64
 ```
 
-The last command prints a build plan without creating an output directory or
-running a compiler. The same command supports `win-x64`, `mac-arm64` and
-`mac-x64`; generating a plan for another platform is not cross-compilation.
+Windows verwendet dafür [python.cmd](../tools/python.cmd) anstelle von
+`python3`. Die Planprüfung liest auch `chrome/VERSION` und `DEPS`;
+diese Dateien müssen im Editingcheckout vorhanden sein. Ein Plan für ein anderes
+Ziel richtet keine Crosskompilierung ein.
 
-The plan also reads `chrome/VERSION` and `DEPS` to identify the source. Include
-those files in a sparse editing checkout. In VS Code, open the source root,
-select a Python 3.11+ interpreter and use the integrated terminal for these same
-commands. Verify `python --version` there: the editor's interpreter selection
-does not necessarily change the terminal's PATH.
-
-### Complete Chromium development workspace
-
-A native browser build requires a full checkout with the dependencies selected
-by Chromium's `DEPS` and a configured `depot_tools` toolchain. Use the instructions
-at the chosen source revision:
+Ein nativer Build benötigt einen vollständigen Aimium-Checkout mit passenden
+DEPS-Abhängigkeiten, depot_tools und der Toolchain des gewählten Quellstands.
+Verbindlich sind dessen Plattformanleitungen:
 
 - [Windows](../../docs/windows_build_instructions.md)
 - [Linux](../../docs/linux/build_instructions.md)
 - [macOS](../../docs/mac_build_instructions.md)
 
-Use a workspace containing `src/` and a sibling `.gclient`. The `src` solution
-should be unmanaged (`"managed": False`), so Git selects the product revision
-and `gclient sync` aligns its dependencies. Keep the upstream repository and the
-Aimium fork as separate Git remotes. Do not replace a developer's existing
-checkout or discard their local changes to make a build work.
+Der äußere gclient-Workspace enthält `.gclient` und den Git-Quellroot `src`.
+In VS Code `src` öffnen; alle folgenden Ausgabeordner sind relativ dazu.
+Die gclient-Solution soll unmanaged sein (`"managed": False`), damit Git den
+Aimium-Quellstand bestimmt und die bewusst vorbereiteten Abhängigkeiten zu
+diesem Stand passen. Ein unveränderter Upstream-Checkout enthält Aimium nicht.
 
-Windows builds need the Windows toolchain described by the selected Chromium
-revision; public builds must use the appropriate locally installed toolchain.
-The Windows development target explicitly uses Ninja (`use_siso=false`) with
-local execution (`use_remoteexec=false`). The first native attempt found Siso
-rejecting an existing SDK directory named in GN's Windows depfile; Ninja is the
-supported fallback documented by depot_tools/autoninja.py. After an attempted
-Siso build, select a fresh output directory, for example
-`--out-dir out/Aimium/win-x64-ninja`. Do not edit generated depfiles or mix Siso's
-`.siso_deps` with Ninja state. Other platform targets retain their executor
-defaults; this Windows setting does not certify their builds.
-macOS builds require a Mac with Xcode and the selected SDK. Linux builds require
-the documented system dependencies. The imported Windows and Linux instructions
-call for at least 100 GB free disk space. A small hosted runner is not an adequate
-full Chromium builder.
+Native Builds brauchen die passende Plattform und Architektur, genügend RAM
+und freien Speicher. Windows benötigt die zur Revision passenden C++-/ATL-/MFC-
+und SDK-Komponenten, macOS Xcode und SDK. Linux benötigt seine beschriebenen
+Systemabhängigkeiten sowie für Browsertests die grafische Testumgebung.
+Der Vorcheck fordert standardmäßig mindestens 100 GiB freien Platz.
+Das ist eine Mindestprüfung, keine Vorhersage der endgültigen Buildgröße.
 
-Provisioned runners may be hosted; owning physical servers is not required.
-Build caches must be separated by platform, architecture, toolchain and relevant
-build arguments. Credentials and signing material must never be cached with
-build outputs.
+## VS-Code-Aufgaben
 
-For a prepared native Linux x64 workspace, use:
+Die Aufgaben in [tasks.json](../../.vscode/tasks.json) verwenden VS-Code-Bordmittel;
+eine Microsoft-Python-Erweiterung ist nicht erforderlich.
 
-```sh
-python aimium/tools/build.py check --target linux-x64
-python aimium/tools/build.py build --target linux-x64 --dry-run
-python aimium/tools/build.py build --target linux-x64
-```
+| Aufgabe | Wirkung |
+| --- | --- |
+| **Aimium: Build + Smoke (lokal)** | Browser und `browser_tests` bauen; danach die fokussierten Aimium-Tests ausführen |
+| **Aimium: Voraussetzungen prüfen** | Native Umgebung prüfen, ohne zu kompilieren |
+| **Aimium: Buildplan prüfen** | Vorcheck und Dry-run, ohne zu kompilieren |
+| **Aimium: Python-Tests (lokal)** | Lokale Referenz-/Werkzeugtests |
+| **Aimium: Vertragsbeispiele (lokal)** | Synthetische Verträge validieren |
 
-Choose the matching native target on Windows or macOS. `check` and the build
-dry run perform preflight checks without changing the checkout. They return a
-nonzero exit code if prerequisites are missing. A real build requires a clean,
-committed source tree, generates its fixed development arguments beneath
-`out/Aimium/<target>/`, and writes `aimium-build-manifest.json` there with the
-source identity, arguments, commands and outcome. It refuses to overwrite
-conflicting existing arguments. It does not fetch dependencies, install tools,
-change branches or prepare an installer.
+Der Nutzer startet den Standardbuild mit Strg+Umschalt+B auf Windows/Linux
+oder Cmd+Umschalt+B auf macOS. Die Buildaufgaben bieten eine Jobauswahl mit
+Standard vier; acht und weitere Grenzen sind auswählbar. Unter macOS muss die
+Zielauswahl `mac-arm64` für Apple Silicon oder `mac-x64` für Intel zum
+Host passen; Linux verwendet `linux-x64`.
 
-The dependency preflight checks real installation directories. In
-`.gclient_entries`, gclient also records GCS and CIPD identities as
-`destination:object-or-package`; their suffix is not a filesystem path. Several
-such records can share one destination. The preflight validates the destination
-and retains the separate source/tool markers. It does not repeat gclient's
-download hash checks or certify every dependency revision.
+Windows-Aufgaben verwenden [python.cmd](../tools/python.cmd). Der Helper kann
+eine optionale `env.cmd` aus dem äußeren Workspace laden.
+`AIMIUM_LOCAL_ENV` wählt ausdrücklich eine andere lokale Umgebungsdatei;
+eine fehlende explizit ausgewählte Datei ist ein Fehler. `AIMIUM_PYTHON`
+bestimmt den Interpreter, `AIMIUM_DEPOT_TOOLS` das depot_tools-Verzeichnis
+für den Taskprozess. Ohne solche Einstellungen muss die benötigte Umgebung
+bereits verfügbar sein. Linux/macOS verwenden `python3` aus PATH.
+Auf allen Plattformen ist Python 3.11+ erforderlich.
 
-When preparing a shallow fork checkout, retain enough ancestry for the pinned
-Chromium commit to be visible. `build/util/lastchange.py --json` must resolve the
-real upstream metadata instead of reporting a dummy version. Confirm the pinned
-commit is an ancestor of HEAD; fetch a bounded amount of additional history as
-needed. Do not fabricate `LASTCHANGE` data or change the product revision to make
-the hooks pass.
+Lokale Konfiguration bleibt außerhalb der veröffentlichten Quelldateien.
+Credentials, persönliche Pfade, CA-Bundles und Maschineninventare gehören nicht
+ins Repository.
 
-Preflight checks catch common missing prerequisites; GN and the compiler still
-determine whether the selected dependencies and SDKs are compatible. A build
-builds the `chrome` target by default. Add `--browser-tests` to also build and
-run the focused Aimium native smoke tests; their result is recorded separately
-under `native_tests`. A manifest with status `built` and native tests marked
-`not_run` is not evidence that those tests passed. Neither mode performs
-packaging or release validation.
+## Buildbefehle und Source-Konsistenz
 
-With `--browser-tests`, discovery must include both named smoke tests below.
-The launcher writes `aimium-browser-tests.json` in the selected output directory;
-the build tool removes any previous summary immediately before the test run.
-Every discovered test must have a `SUCCESS` execution record in every iteration.
-Missing, skipped, failed or stale results cannot certify a successful test run,
-even if the process exits with code zero. Automatic launcher retries are disabled.
-The build manifest records discovered names, successful execution statuses and
-the summary hash. Keep both files with the build log; review/redact logs before
-sharing because Chromium's raw summary can contain test output and paths.
+`build.py` bietet unterschiedliche Prüftiefen:
 
-## Reviewable development
+| Aufruf | Verhalten |
+| --- | --- |
+| `plan` | Source-/Zielplan ausgeben; keine GN-Generierung und keine Kompilierung |
+| `check` | Voraussetzungen prüfen; keine Kompilierung |
+| `build --dry-run` | Vorcheck und vollständigen Befehlsplan ausgeben; keine Kompilierung |
+| `build` | Nach bestandenem Vorcheck GN und Compiler starten |
+| `build --browser-tests` | Zusätzlich `browser_tests` bauen und die fokussierten Aimium-Tests ausführen |
 
-Keep product work in short, focused commits on feature branches. Preserve
-upstream files where possible, and prefer narrowly scoped registration points
-over broad refactoring. Follow the checked-in Chromium style and build rules.
+Die echten Buildaufrufe sind ausschließlich für den Nutzer im integrierten
+VS-Code-Terminal des vollständigen Quellroots vorgesehen.
 
-Do not amend commits or rewrite shared history. Integrate a new Chromium base on
-a dedicated upgrade branch, resolve conflicts, synchronize dependencies, and
-run the appropriate checks before merging the upgrade.
-
-Each upgrade records the selected source SHA and version, channel, dependency
-state, build arguments and validation results. The highest Git tag is not
-necessarily a Stable release. Confirm the actual channel and platform release
-before changing `release_eligible`.
-
-## Native developer screen
-
-The `Aimium` runtime feature is disabled by default. For development, enable it
-with `--enable-features=Aimium` and navigate to `chrome://aimium` using a dedicated
-development user-data directory. This shows the foundation screen only.
-
-Treat both feature-disabled and feature-enabled behavior as native test cases.
-A source review or a green Python job is not evidence that the WebUI compiled,
-that GRIT/TypeScript registration succeeded, or that either browser test passed.
-
-The two native smoke tests are registered in `//chrome/test:browser_tests`:
-`AimiumUIDisabledBrowserTest.NotAvailable` and
-`AimiumUIBrowserTest.LoadsFoundation`. In a prepared workspace, run them with:
-
-```sh
-python aimium/tools/build.py build --target linux-x64 --browser-tests
-```
-
-This also builds the `browser_tests` Ninja target. For manual invocation, the
-focused filter is
-`--gtest_filter=AimiumUIBrowserTest.*:AimiumUIDisabledBrowserTest.*`. The enabled
-test checks the actual bundled Lit application, not just the page's static
-title. Linux runners need the graphical test environment described by Chromium's
-testing documentation and the tool's preflight output.
-
-## Required evidence
-
-Record the exact command, source SHA, target, operating system and outcome for
-each performed check. A check which could not run is **not run**, never passed.
-
-Before accepting the native milestone, require:
-
-1. The selected desktop browser target builds on Windows, Linux and macOS.
-2. The new native browser tests compile and pass in the relevant test binary.
-3. `chrome://aimium` loads with the feature enabled and remains unavailable with
-   the feature disabled.
-4. The existing browser still starts and navigates normally.
-5. No provider call, credential access or real website mutation occurs in P0.
-
-The manual native workflow requires explicitly provisioned, suitable runners.
-It is separate from ordinary pull-request checks and must not be represented as
-a completed platform build simply because its configuration exists.
-
-### GitHub Actions setup
-
-[Foundation checks](../../.github/workflows/aimium-checks.yml) run the Python
-tests and example validation on Ubuntu, Windows and macOS. They need neither
-provider credentials nor a full Chromium toolchain.
-
-[Native development builds](../../.github/workflows/aimium-native-build.yml)
-have a manual trigger and an additional repository-variable gate:
-`AIMIUM_NATIVE_BUILDS_ENABLED=true`. Configure the dedicated runner with
-`AIMIUM_CHROMIUM_SOURCE` pointing to its complete, synchronized source solution.
-The checkout must be clean and at the exact commit selected for the workflow.
-Runner labels are `self-hosted`, `aimium`, the platform (`Linux`, `Windows` or
-`macOS`) and the CPU (`X64` or `ARM64`), as listed in
-[targets.json](../build/targets.json).
-
-The workflow does not provision or synchronize a runner. Linux smoke tests also
-require `vpython3`, Xvfb and Openbox. Chromium tools may populate their hermetic
-runtime caches; prepare those environments on the runner as part of setup.
-Select the optional `browser_tests` input to run the two Aimium tests after the
-build. The build receipt stays in the prepared output directory. A skipped
-workflow or an unused workflow definition supplies no native validation result.
-
-### Manual build before the workflow reaches the default branch
-
-GitHub requires a `workflow_dispatch` workflow to exist on the default branch
-before it can be dispatched, even when selecting another ref; see
-[GitHub's manual-run documentation](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
-The foundation PR must not be merged merely to make a build button appear.
-Until the workflow is eligible, use a terminal on an explicitly prepared native
-host. This is a local invocation, not a GitHub Actions run or runner provisioning.
-
-For Windows PowerShell, from the full source root, replace the SHA with the
-reviewed implementation commit (all 40 hexadecimal characters):
+Windows-Beispiel mit acht Compilerjobs:
 
 ```powershell
-$expectedCommit = '<reviewed-40-character-commit>'
-if ($expectedCommit -notmatch '^[0-9a-f]{40}$') { throw 'Set the reviewed SHA.' }
-$actualCommit = git rev-parse HEAD
-if ($LASTEXITCODE -ne 0 -or $actualCommit -ne $expectedCommit) { throw 'Wrong source revision.' }
-$sourceChanges = git status --porcelain=v1 --untracked-files=normal
-if ($LASTEXITCODE -ne 0 -or $sourceChanges) { throw 'Source must be clean and committed.' }
-python --version
-python aimium/tools/build.py check --target win-x64 --browser-tests
+.\aimium\tools\python.cmd aimium\tools\build.py check --target win-x64 --browser-tests --out-dir out/Aimium/win-x64-ninja
 if ($LASTEXITCODE -ne 0) { throw 'Resolve the reported prerequisites first.' }
-python aimium/tools/build.py build --target win-x64 --browser-tests --jobs 4 --dry-run
+.\aimium\tools\python.cmd aimium\tools\build.py build --target win-x64 --browser-tests --jobs 8 --out-dir out/Aimium/win-x64-ninja --dry-run
 if ($LASTEXITCODE -ne 0) { throw 'Build plan failed.' }
-python aimium/tools/build.py build --target win-x64 --browser-tests --jobs 4
+.\aimium\tools\python.cmd aimium\tools\build.py build --target win-x64 --browser-tests --jobs 8 --out-dir out/Aimium/win-x64-ninja
 if ($LASTEXITCODE -ne 0) { throw 'Build or smoke tests failed; inspect the receipt.' }
 ```
 
-Use the corresponding target on Linux/macOS and stop after any nonzero command.
-Size `--jobs` for the actual host. Prepare dependencies and SDKs using the
-revision's platform instructions; this sequence deliberately does not sync,
-reset, install or change branches. Do not copy a personal browser profile.
+Auf Linux/macOS `python3` und das passende native Ziel verwenden.
+Nach einem nicht erfolgreichen Vorcheck oder Dry-run nicht weiterbauen.
 
-After a successful Windows build, test normal startup/navigation separately:
+Ein echter Build verlangt einen sauberen, committeten Quellstand und zeichnet
+dessen Identität auf. Er überschreibt keine widersprüchlichen vorhandenen
+`args.gn`. Das Werkzeug synchronisiert keine Abhängigkeiten, installiert keine
+Voraussetzungen, wechselt keinen Branch und committet oder setzt nichts zurück.
 
-```powershell
-$profile = Join-Path ([IO.Path]::GetTempPath()) ('aimium-dev-' + [guid]::NewGuid())
-& .\out\Aimium\win-x64\chrome.exe "--user-data-dir=$profile" --no-first-run --enable-features=Aimium chrome://aimium
-```
+Der Abhängigkeitsvorcheck prüft reale Installationsverzeichnisse.
+`.gclient_entries` kann GCS-/CIPD-Einträge als `destination:object-or-package`
+enthalten; ihr Suffix ist kein Dateipfad. Mehrere Einträge können ein Ziel teilen.
+Der Vorcheck ersetzt weder gclients Downloadintegritätsprüfung noch die
+Kompatibilitätsprüfung durch GN und Compiler.
 
-Use a controlled local HTTP fixture, confirm its navigation and page rendering,
-then close the browser. Record the fixture, observed outcome and source SHA.
-This manual step is still required: the two WebUI tests do not prove ordinary
-website navigation. Never add `--no-sandbox` or certificate bypass switches.
+Bei flachen Checkouts muss die erforderliche Upstream-Abstammung für die
+Versionswerkzeuge vorhanden sein. `build/util/lastchange.py --json` muss echte
+Upstream-Metadaten statt einer erfundenen Version ermitteln können.
+Keine `LASTCHANGE`-Daten fälschen und keinen Produktquellstand ändern, um
+fehlende Metadaten zu verdecken.
 
-## Later release gates
+## Ninja-Ausgabe inkrementell verwenden
 
-P0 is not signed, notarized, branded or packaged as a production Aimium release.
-Before distributing the browser, implement and verify a separate application
-and profile identity, license notices, the selected Stable baseline, native
-integration, signing and installation/update paths. Supply signing identities
-through the platform's protected secrets mechanism, never through source files.
+Windows verwendet laut [targets.json](../build/targets.json)
+`use_siso=false` und `use_remoteexec=false`, also lokalen Ninja-Betrieb.
+Für Windows ausdrücklich `--out-dir out/Aimium/win-x64-ninja` verwenden.
+Andere Ziele behalten ihre jeweiligen Ausführungsstandards; die Windowswahl
+belegt keine erfolgreiche Prüfung der anderen Plattformen.
 
-Before testing real connectors, use a dedicated development credential with a
-deliberate budget. Before testing browser actions on external sites, define the
-test identity, target data and authorized operations. The first reproducible
-action tests should use a controlled local fixture website.
+Ein kompatibler bestehender Ninja-Outdir bleibt erhalten. Nach einem Abbruch
+können gültige Objekte wiederverwendet werden; Ninja baut fehlende oder durch
+Abhängigkeiten veraltete Arbeit neu. Eine Änderung von `--jobs` betrifft die
+Parallelität und löscht keine gültigen Objekte.
+
+Wiederverwendung setzt kompatible Source-/DEPS-Stände, Toolchain und GN-Argumente
+voraus. Plattformen, Architekturen, inkompatible Einstellungen sowie Siso- und
+Ninja-Zustand brauchen getrennte Ausgaben. Einen passenden vorhandenen Outdir
+nicht allein zum Fortsetzen löschen oder durch einen neuen Cache ersetzen.
+Ein Cachetreffer ist kein Testergebnis und garantiert keine bestimmte Restdauer.
+
+## Native Tests und normale Navigation
+
+Die beiden nativen Smoke-Tests gehören zu `//chrome/test:browser_tests`:
+
+- `AimiumUIBrowserTest.LoadsFoundation`
+- `AimiumUIDisabledBrowserTest.NotAvailable`
+
+`--browser-tests` muss beide Namen tatsächlich entdecken und frisch ausführen.
+Der fokussierte Filter lautet
+`--gtest_filter=AimiumUIBrowserTest.*:AimiumUIDisabledBrowserTest.*`.
+Es wird nicht die gesamte Chromium-Browsertestsuite gestartet.
+Der aktivierte Test prüft die gebündelte Lit-Anwendung, nicht nur ihren Titel.
+
+Der Launcher schreibt `aimium-browser-tests.json` in den Ausgabeordner.
+Das Buildwerkzeug entfernt einen vorherigen Testbericht unmittelbar vor dem
+neuen Lauf. Alle entdeckten Tests müssen in jeder Iteration einen
+`SUCCESS`-Ausführungsdatensatz haben. Fehlende, leere, übersprungene,
+fehlgeschlagene oder veraltete Ergebnisse sind kein Erfolg; ein Exitcode null
+allein genügt nicht. Automatische Launcher-Wiederholungen sind deaktiviert.
+
+Das lokale `aimium-build-manifest.json` hält Source-Identität, Argumente,
+Befehle und Ergebnis sowie getrennt `native_tests` fest.
+`status: built` bei `native_tests.status: not_run` belegt keinen bestandenen
+Smoke-Test. Ein unterbrochener Build bleibt ohne vollständigen Abnahmenachweis.
+
+Der erwartete Windows-Browser liegt unter
+`out/Aimium/win-x64-ninja/chrome.exe`. Seine Existenz allein reicht nicht.
+Nach einem erfolgreichen Build sind normaler Start und Navigation gesondert
+mit einem neuen, getrennten Entwicklungsprofil und kontrollierten lokalen
+HTTP-Fixtures zu prüfen. Persönliche Browserprofile oder Konten nicht verwenden.
+
+Das standardmäßig deaktivierte Feature wird mit `--enable-features=Aimium`
+eingeschaltet; `chrome://aimium` zeigt die Foundationseite.
+Beide Featurezustände sowie normale Navigation brauchen echte native Nachweise.
+Keine Sandboxabschaltung, Zertifikatsumgehung oder Lockerung der Profiltrennung
+für einen Test einführen.
+
+## Abnahme und öffentliche Dokumentation
+
+Für die native Baseline sind erforderlich:
+
+1. Vollständige Browser- und Ressourcenbuilds für die vereinbarten Desktopziele.
+2. Kompilierte und tatsächlich bestandene Feature-an/aus-Smoke-Tests.
+3. Normaler Browserstart und Navigation in einem getrennten Entwicklungsprofil.
+4. Zuordnung der Ergebnisse zu Source-, Abhängigkeits-, Toolchain- und GN-Stand.
+5. Keine Provideraufrufe, Credentialzugriffe oder echten Websiteänderungen in P0.
+
+Ein erster Plattformnachweis schließt nicht die übrige Matrix.
+Leichte Python-Tests, vorhandene Testdateien und die Taskkonfiguration sind keine
+Belege für C++-/WebUI-Kompilierung oder Browserfunktion.
+
+Buildbelege und Rohlogs bleiben lokal und außerhalb versionierter Publikationen.
+Öffentlich dokumentiert werden Funktionsumfang, portable Reproduktionswege und
+offene Abnahmekriterien. Persönliche Informationen, tatsächliche lokale Pfade,
+Maschineninventare und Installations-/Administrationschroniken werden nicht
+veröffentlicht. Die öffentliche Statusdokumentation enthält keine vergänglichen
+Implementierungsheads oder lokalen Laufprotokolle.
+
+## Weitere Releasegates
+
+P0 ist kein signiertes, notarisiertes oder als Produktions-Aimium paketiertes
+Release. Separate Anwendungs-/Profilidentität, verifizierte Stable-Basis,
+Lizenzen, native Plattformprüfung, Signierung und getestete Installation/Updates
+sind weitere Gates. Signing- und Providercredentials gehören in geeignete lokale
+Geheimnisspeicher, nicht in die Quellen.
+
+Die [Produktvision](product-vision.md), der
+[Entwicklungsplan](development-plan.md) und
+[AIM-001](tasks/AIM-001-native-baseline.md) bestimmen die Reihenfolge.
