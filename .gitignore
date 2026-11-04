@@ -1,4 +1,15 @@
 /client-py/
+# Private local configuration and execution evidence must stay outside Git.
+/env.cmd
+/.env.*
+!/.env.example
+/.local/
+/logs/
+/artifacts/
+/aimium/local/
+/aimium/docs/evidence/
+/aimium-build-manifest.json
+/aimium-browser-tests.json
 *.bak
 *.code-workspace
 *.gstmp
