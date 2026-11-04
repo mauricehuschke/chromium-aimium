@@ -6,10 +6,43 @@ on:
     paths:
       - 'aimium/**'
       - '.github/workflows/aimium*.yml'
+      # Native paths and registration points from the foundation PR diff.
+      - 'chrome/browser/resources/aimium/**'
+      - 'chrome/browser/ui/webui/aimium/**'
+      - 'chrome/browser/resources/BUILD.gn'
+      - 'chrome/browser/ui/webui/BUILD.gn'
+      - 'chrome/browser/ui/webui/chrome_web_ui_configs.cc'
+      - 'chrome/browser/ui/webui/web_ui_all_urls_browser_test.cc'
+      - 'chrome/browser/ui/webui/webui_urls_for_test.cc'
+      - 'chrome/chrome_paks.gni'
+      - 'chrome/common/chrome_features.cc'
+      - 'chrome/common/chrome_features.h'
+      - 'chrome/common/webui_url_constants.h'
+      - 'chrome/test/BUILD.gn'
+      - 'third_party/lit/v3_0/BUILD.gn'
+      - 'tools/gritsettings/resource_ids.spec'
+      - 'tools/metrics/histograms/metadata/page/histograms.xml'
+      - 'tools/metrics/histograms/metadata/ui/enums.xml'
   pull_request:
     paths:
       - 'aimium/**'
       - '.github/workflows/aimium*.yml'
+      - 'chrome/browser/resources/aimium/**'
+      - 'chrome/browser/ui/webui/aimium/**'
+      - 'chrome/browser/resources/BUILD.gn'
+      - 'chrome/browser/ui/webui/BUILD.gn'
+      - 'chrome/browser/ui/webui/chrome_web_ui_configs.cc'
+      - 'chrome/browser/ui/webui/web_ui_all_urls_browser_test.cc'
+      - 'chrome/browser/ui/webui/webui_urls_for_test.cc'
+      - 'chrome/chrome_paks.gni'
+      - 'chrome/common/chrome_features.cc'
+      - 'chrome/common/chrome_features.h'
+      - 'chrome/common/webui_url_constants.h'
+      - 'chrome/test/BUILD.gn'
+      - 'third_party/lit/v3_0/BUILD.gn'
+      - 'tools/gritsettings/resource_ids.spec'
+      - 'tools/metrics/histograms/metadata/page/histograms.xml'
+      - 'tools/metrics/histograms/metadata/ui/enums.xml'
   workflow_dispatch:
 
 permissions:
@@ -34,6 +67,7 @@ jobs:
         with:
           sparse-checkout: |
             aimium
+            .github/workflows
           fetch-depth: 1
           persist-credentials: false
       - name: Set up Python

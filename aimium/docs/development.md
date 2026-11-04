@@ -33,6 +33,12 @@ The last command prints a build plan without creating an output directory or
 running a compiler. The same command supports `win-x64`, `mac-arm64` and
 `mac-x64`; generating a plan for another platform is not cross-compilation.
 
+The plan also reads `chrome/VERSION` and `DEPS` to identify the source. Include
+those files in a sparse editing checkout. In VS Code, open the source root,
+select a Python 3.11+ interpreter and use the integrated terminal for these same
+commands. Verify `python --version` there: the editor's interpreter selection
+does not necessarily change the terminal's PATH.
+
 ### Complete Chromium development workspace
 
 A native browser build requires a full checkout with the dependencies selected
@@ -85,6 +91,16 @@ run the focused Aimium native smoke tests; their result is recorded separately
 under `native_tests`. A manifest with status `built` and native tests marked
 `not_run` is not evidence that those tests passed. Neither mode performs
 packaging or release validation.
+
+With `--browser-tests`, discovery must include both named smoke tests below.
+The launcher writes `aimium-browser-tests.json` in the selected output directory;
+the build tool removes any previous summary immediately before the test run.
+Every discovered test must have a `SUCCESS` execution record in every iteration.
+Missing, skipped, failed or stale results cannot certify a successful test run,
+even if the process exits with code zero. Automatic launcher retries are disabled.
+The build manifest records discovered names, successful execution statuses and
+the summary hash. Keep both files with the build log; review/redact logs before
+sharing because Chromium's raw summary can contain test output and paths.
 
 ## Reviewable development
 
@@ -165,6 +181,51 @@ runtime caches; prepare those environments on the runner as part of setup.
 Select the optional `browser_tests` input to run the two Aimium tests after the
 build. The build receipt stays in the prepared output directory. A skipped
 workflow or an unused workflow definition supplies no native validation result.
+
+### Manual build before the workflow reaches the default branch
+
+GitHub requires a `workflow_dispatch` workflow to exist on the default branch
+before it can be dispatched, even when selecting another ref; see
+[GitHub's manual-run documentation](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+The foundation PR must not be merged merely to make a build button appear.
+Until the workflow is eligible, use a terminal on an explicitly prepared native
+host. This is a local invocation, not a GitHub Actions run or runner provisioning.
+
+For Windows PowerShell, from the full source root, replace the SHA with the
+reviewed implementation commit (all 40 hexadecimal characters):
+
+```powershell
+$expectedCommit = '<reviewed-40-character-commit>'
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$') { throw 'Set the reviewed SHA.' }
+$actualCommit = git rev-parse HEAD
+if ($LASTEXITCODE -ne 0 -or $actualCommit -ne $expectedCommit) { throw 'Wrong source revision.' }
+$sourceChanges = git status --porcelain=v1 --untracked-files=normal
+if ($LASTEXITCODE -ne 0 -or $sourceChanges) { throw 'Source must be clean and committed.' }
+python --version
+python aimium/tools/build.py check --target win-x64 --browser-tests
+if ($LASTEXITCODE -ne 0) { throw 'Resolve the reported prerequisites first.' }
+python aimium/tools/build.py build --target win-x64 --browser-tests --jobs 4 --dry-run
+if ($LASTEXITCODE -ne 0) { throw 'Build plan failed.' }
+python aimium/tools/build.py build --target win-x64 --browser-tests --jobs 4
+if ($LASTEXITCODE -ne 0) { throw 'Build or smoke tests failed; inspect the receipt.' }
+```
+
+Use the corresponding target on Linux/macOS and stop after any nonzero command.
+Size `--jobs` for the actual host. Prepare dependencies and SDKs using the
+revision's platform instructions; this sequence deliberately does not sync,
+reset, install or change branches. Do not copy a personal browser profile.
+
+After a successful Windows build, test normal startup/navigation separately:
+
+```powershell
+$profile = Join-Path ([IO.Path]::GetTempPath()) ('aimium-dev-' + [guid]::NewGuid())
+& .\out\Aimium\win-x64\chrome.exe "--user-data-dir=$profile" --no-first-run --enable-features=Aimium chrome://aimium
+```
+
+Use a controlled local HTTP fixture, confirm its navigation and page rendering,
+then close the browser. Record the fixture, observed outcome and source SHA.
+This manual step is still required: the two WebUI tests do not prove ordinary
+website navigation. Never add `--no-sandbox` or certificate bypass switches.
 
 ## Later release gates
 

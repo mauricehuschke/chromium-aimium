@@ -31,6 +31,10 @@ import tempfile
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
 MIN_FREE_GIB = 100
 BROWSER_TEST_FILTER = "AimiumUIBrowserTest.*:AimiumUIDisabledBrowserTest.*"
+REQUIRED_BROWSER_TESTS = frozenset((
+    "AimiumUIBrowserTest.LoadsFoundation",
+    "AimiumUIDisabledBrowserTest.NotAvailable",
+))
 DEPENDENCY_MARKERS = (
     "base/BUILD.gn",
     "third_party/blink/renderer/BUILD.gn",
@@ -274,7 +278,11 @@ def make_plan(root, target, out, identity, tools, jobs=None, browser_tests=False
             test_command.append("--use-xvfb")
         commands.extend([
             {"step": "list_aimium_tests", "argv": test_command + ["--gtest_list_tests"]},
-            {"step": "run_aimium_tests", "argv": test_command + ["--test-launcher-jobs=1"]},
+            {"step": "run_aimium_tests", "argv": test_command + [
+                "--test-launcher-jobs=1",
+                "--test-launcher-retry-limit=0",
+                f"--test-launcher-summary-output={out / 'aimium-browser-tests.json'}",
+            ]},
         ])
     environment = {"DEPOT_TOOLS_UPDATE": "0", "DEPOT_TOOLS_METRICS": "0"}
     if target["host_os"] == "Windows":
@@ -293,7 +301,9 @@ def make_plan(root, target, out, identity, tools, jobs=None, browser_tests=False
         "tools": tools,
         "environment_overrides": environment,
         "commands": commands,
-        "native_tests": {"requested": browser_tests, "filter": BROWSER_TEST_FILTER, "status": "not_run"},
+        "native_tests": {"requested": browser_tests, "filter": BROWSER_TEST_FILTER,
+                         "required": sorted(REQUIRED_BROWSER_TESTS),
+                         "status": "not_run"},
         "scope": "Development build. Optional AimiumUI* tests only; no signing, packaging, or integration certification.",
     }
 
@@ -308,6 +318,50 @@ def atomic_json(path, data):
         os.replace(temp, path)
     finally:
         temp.unlink(missing_ok=True)
+
+
+def discover_browser_tests(output):
+    """Read gtest's suite/test listing, ignoring comments and diagnostic lines."""
+    suite = None
+    tests = set()
+    for line in output.splitlines():
+        line = line.split("#", 1)[0].rstrip()
+        if re.fullmatch(r"[A-Za-z0-9_/]+\.", line):
+            suite = line
+        elif suite and re.fullmatch(r"  [A-Za-z0-9_/]+", line):
+            tests.add(suite + line.strip())
+        elif line and not line.startswith(" "):
+            suite = None
+    missing = REQUIRED_BROWSER_TESTS - tests
+    if missing:
+        raise BuildError("Missing required Aimium browser tests: " + ", ".join(sorted(missing)))
+    return sorted(tests)
+
+
+def browser_test_results(path, discovered):
+    """Require actual successful executions in Chromium's launcher summary.
+
+    A zero exit code, a listed test or an old receipt alone is not execution
+    evidence. Retries, skipped tests and partial/empty iterations cannot pass.
+    """
+    summary = read_json(path)
+    iterations = summary.get("per_iteration_data") if isinstance(summary, dict) else None
+    if not isinstance(iterations, list) or not iterations:
+        raise BuildError("Browser test summary contains no execution iterations.")
+    results = {name: [] for name in discovered}
+    for iteration in iterations:
+        if not isinstance(iteration, dict):
+            raise BuildError("Invalid browser test execution iteration.")
+        for name in discovered:
+            attempts = iteration.get(name)
+            if not isinstance(attempts, list) or not attempts:
+                raise BuildError(f"No execution evidence for {name}.")
+            for attempt in attempts:
+                status = attempt.get("status") if isinstance(attempt, dict) else None
+                if status != "SUCCESS":
+                    raise BuildError(f"{name} did not pass: {status!r}.")
+                results[name].append(status)
+    return results
 
 
 def run_build(root, out, plan):
@@ -339,6 +393,12 @@ def run_build(root, out, plan):
     try:
         for command in plan["commands"]:
             capture = command["step"] == "list_aimium_tests"
+            if command["step"] == "run_aimium_tests":
+                summary = out / "aimium-browser-tests.json"
+                # A previous run's successful summary must never certify this run.
+                summary.unlink(missing_ok=True)
+                plan["native_tests"]["status"] = "running"
+                atomic_json(manifest, plan)
             result = subprocess.run(command["argv"], cwd=root, env=environment, check=False,
                                     capture_output=capture, text=capture)
             plan["step_results"].append({"step": command["step"], "exit_code": result.returncode})
@@ -346,13 +406,15 @@ def run_build(root, out, plan):
                 print(result.stdout, end="")
                 print(result.stderr, end="", file=sys.stderr)
             if capture and not result.returncode:
-                lines = result.stdout.splitlines()
-                has_suite = any(re.match(r"^AimiumUI[^\s]*\.", line) for line in lines)
-                has_test = any(re.match(r"^  [A-Za-z0-9_]", line) for line in lines)
-                if not has_suite or not has_test:
-                    raise BuildError("No AimiumUI* browser tests were discovered; refusing a vacuous test pass.")
+                plan["native_tests"]["discovered"] = discover_browser_tests(result.stdout)
             if command["step"] == "run_aimium_tests":
-                plan["native_tests"]["status"] = "passed" if result.returncode == 0 else "failed"
+                if result.returncode:
+                    plan["native_tests"]["status"] = "failed"
+                else:
+                    plan["native_tests"]["executed"] = browser_test_results(
+                        summary, plan["native_tests"]["discovered"])
+                    plan["native_tests"]["summary_sha256"] = file_hash(summary)
+                    plan["native_tests"]["status"] = "passed"
             atomic_json(manifest, plan)
             if result.returncode:
                 raise BuildError(f"{command['step']} failed with exit code {result.returncode}.")
@@ -368,6 +430,8 @@ def run_build(root, out, plan):
         plan["executable_sha256"] = file_hash(executable)
         exit_code = 0
     except (BuildError, OSError, KeyboardInterrupt) as exc:
+        if plan["native_tests"]["status"] == "running":
+            plan["native_tests"]["status"] = "failed"
         plan["status"] = "failed"
         plan["error"] = str(exc) or "Build interrupted."
         print(plan["error"], file=sys.stderr)

@@ -238,7 +238,84 @@ class BuildFoundationTest(unittest.TestCase):
         self.assertEqual(3, run.call_count)
         self.assertEqual("failed", plan["status"])
         self.assertNotEqual("passed", plan["native_tests"]["status"])
-        self.assertIn("No AimiumUI*", plan["error"])
+        self.assertIn("Missing required Aimium", plan["error"])
+
+    def test_discovery_requires_both_named_smoke_tests(self):
+        for listing in (
+                "AimiumUIBrowserTest.\n  LoadsFoundation\n",
+                "AimiumUIDisabledBrowserTest.\n  NotAvailable\n",
+                "AimiumUIBrowserTest.\nOtherTest.\n  LoadsFoundation\n",
+                "AimiumUIBrowserTest.\n  DISABLED_LoadsFoundation\n"
+                "AimiumUIDisabledBrowserTest.\n  NotAvailable\n"):
+            with self.subTest(listing=listing), self.assertRaises(build.BuildError):
+                build.discover_browser_tests(listing)
+        listing = ("Diagnostic before listing\nAimiumUIBrowserTest. # comment\n"
+                   "  LoadsFoundation\nAimiumUIDisabledBrowserTest.\n  NotAvailable\n")
+        self.assertEqual(sorted(build.REQUIRED_BROWSER_TESTS),
+                         build.discover_browser_tests(listing))
+
+    def test_summary_requires_successful_execution_of_every_discovered_test(self):
+        names = sorted(build.REQUIRED_BROWSER_TESTS)
+        summary = self.workspace / "summary.json"
+        success = {name: [{"status": "SUCCESS"}] for name in names}
+        invalid = [None, {}, {"per_iteration_data": []},
+                   {"per_iteration_data": [{}]},
+                   {"per_iteration_data": [success, {}]}]
+        for status in ("SKIPPED", "FAILURE", "CRASH", "TIMEOUT", None):
+            invalid.append({"per_iteration_data": [
+                dict(success, **{names[0]: [{"status": status}]})]})
+        for attempts in ([], None, [None], [{"status": "FAILURE"}, {"status": "SUCCESS"}]):
+            invalid.append({"per_iteration_data": [dict(success, **{names[0]: attempts})]})
+        for data in invalid:
+            with self.subTest(data=data):
+                summary.write_text(json.dumps(data), encoding="utf-8")
+                with self.assertRaises(build.BuildError):
+                    build.browser_test_results(summary, names)
+        summary.write_text(json.dumps({"per_iteration_data": [success]}), encoding="utf-8")
+        self.assertEqual({name: ["SUCCESS"] for name in names},
+                         build.browser_test_results(summary, names))
+        with self.assertRaises(build.BuildError):
+            build.browser_test_results(summary, names + ["AimiumUIBrowserTest.NewTest"])
+        summary.write_text("not JSON", encoding="utf-8")
+        with self.assertRaises(build.BuildError):
+            build.browser_test_results(summary, names)
+
+    def test_build_receipt_requires_fresh_execution_summary(self):
+        # These are orchestrator mocks, not native build/test evidence.
+        listing = ("AimiumUIBrowserTest.\n  LoadsFoundation\n"
+                   "AimiumUIDisabledBrowserTest.\n  NotAvailable\n")
+        success = {"per_iteration_data": [{name: [{"status": "SUCCESS"}]
+                                          for name in build.REQUIRED_BROWSER_TESTS}]}
+        self.out.mkdir(parents=True)
+        (self.out / "chrome").write_bytes(b"unit-test-placeholder")
+        summary = self.out / "aimium-browser-tests.json"
+        for fresh in (False, True):
+            with self.subTest(fresh=fresh):
+                summary.write_text(json.dumps(success), encoding="utf-8")
+                plan = build.make_plan(self.root, self.target, self.out, self.identity,
+                                       self.tools, browser_tests=True)
+                plan["preflight"] = {"ok": True}
+
+                def run(argv, **kwargs):
+                    if any(arg.startswith("--test-launcher-summary-output=") for arg in argv):
+                        self.assertFalse(summary.exists())
+                        if fresh:
+                            summary.write_text(json.dumps(success), encoding="utf-8")
+                    return SimpleNamespace(returncode=0, stdout=listing)
+
+                with mock.patch.object(build.subprocess, "run", side_effect=run), \
+                     mock.patch.object(build, "source_identity", return_value=self.identity), \
+                     contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    code = build.run_build(self.root, self.out, plan)
+                receipt = json.loads((self.out / "aimium-build-manifest.json").read_text())
+                self.assertEqual(0 if fresh else 1, code)
+                self.assertEqual("passed" if fresh else "failed", receipt["native_tests"]["status"])
+                if fresh:
+                    self.assertEqual(sorted(build.REQUIRED_BROWSER_TESTS),
+                                     receipt["native_tests"]["discovered"])
+                    self.assertEqual({name: ["SUCCESS"] for name in build.REQUIRED_BROWSER_TESTS},
+                                     receipt["native_tests"]["executed"])
+                    self.assertEqual(build.file_hash(summary), receipt["native_tests"]["summary_sha256"])
 
     def test_source_change_during_compile_is_reported_as_unverified_failure(self):
         self.out.mkdir(parents=True)
