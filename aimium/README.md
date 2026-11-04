@@ -113,6 +113,10 @@ werden:
 - `AIMIUM_PYTHON`: Pfad zum Python-Interpreter; Python 3.11+ bleibt erforderlich.
 - `AIMIUM_DEPOT_TOOLS`: Verzeichnis der lokal eingerichteten depot_tools.
 
+Der Launcher verwendet den gewählten Interpreter auch für nachgelagerte
+`python3`-Batchaufrufe, etwa Protobuf-Plugins. Diese Auswahl gilt nur für den
+Taskprozess und seine Unterprozesse; System-PATH und App-Aliase werden nicht geändert.
+
 Eine bereits passend eingerichtete Umgebung benötigt keine `env.cmd`.
 Persönliche Konfiguration, Zugangsschlüssel und andere Geheimnisse gehören nicht
 ins Repository. Auf Linux und macOS verwenden die Aufgaben `python3`; auch dort

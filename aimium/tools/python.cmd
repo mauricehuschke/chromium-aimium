@@ -19,5 +19,5 @@ if defined AIMIUM_DEPOT_TOOLS (
   set "PATH=%AIMIUM_DEPOT_TOOLS%;%PATH%"
 )
 if not defined AIMIUM_PYTHON set "AIMIUM_PYTHON=python"
-"%AIMIUM_PYTHON%" %*
+"%AIMIUM_PYTHON%" "%~dp0run_python.py" %*
 exit /b %errorlevel%

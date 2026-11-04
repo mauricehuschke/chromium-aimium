@@ -89,6 +89,10 @@ für den Taskprozess. Ohne solche Einstellungen muss die benötigte Umgebung
 bereits verfügbar sein. Linux/macOS verwenden `python3` aus PATH.
 Auf allen Plattformen ist Python 3.11+ erforderlich.
 
+Der Windows-Launcher bindet auch nachgelagerte `python3`-Batchaufrufe an den
+gewählten Interpreter. Dafür setzt er einen prozesslokalen Shim vor den übrigen
+PATH; globale PATH-Einstellungen und Windows-App-Ausführungsaliase bleiben gleich.
+
 Lokale Konfiguration bleibt außerhalb der veröffentlichten Quelldateien.
 Credentials, persönliche Pfade, CA-Bundles und Maschineninventare gehören nicht
 ins Repository.

@@ -46,6 +46,8 @@ class WindowsPythonLauncherTest(unittest.TestCase):
         self.tools.mkdir(parents=True)
         self.launcher = self.tools / "python.cmd"
         shutil.copyfile(REPO / "aimium/tools/python.cmd", self.launcher)
+        shutil.copyfile(REPO / "aimium/tools/run_python.py", self.tools / "run_python.py")
+        shutil.copytree(REPO / "aimium/tools/python-bin", self.tools / "python-bin")
         self.probe = self.workspace / "argument probe.py"
         self.result = self.workspace / "probe result.json"
         self.probe.write_text(
@@ -112,7 +114,31 @@ class WindowsPythonLauncherTest(unittest.TestCase):
         self.environment["AIMIUM_DEPOT_TOOLS"] = str(depot)
         result = self.run_probe()
         self.assertEqual(27, result.returncode, result.stdout + result.stderr)
-        self.assertEqual(str(depot), json.loads(self.result.read_text())["path"].split(";")[0])
+        path = json.loads(self.result.read_text())["path"].split(";")
+        self.assertEqual(str(self.tools / "python-bin"), path[0])
+        self.assertEqual(str(depot), path[1])
+
+    def test_batch_plugin_python3_uses_selected_interpreter_before_broken_alias(self):
+        self.write_environment(self.workspace / "env.cmd", "sibling")
+        aliases = self.workspace / "broken aliases"
+        aliases.mkdir()
+        (aliases / "python3.bat").write_text("@exit /b 99\n", encoding="utf-8")
+        self.environment["PATH"] = str(aliases) + ";" + self.environment["PATH"]
+        self.environment["PATHEXT"] = ".COM;.EXE;.BAT;.CMD"
+        plugin = self.workspace / "plugin.bat"
+        plugin.write_text('@echo off\npython3 "%~dp0argument probe.py" %*\n', encoding="utf-8")
+        driver = self.workspace / "plugin driver.py"
+        driver.write_text(
+            "import os, subprocess, sys\n"
+            "sys.exit(subprocess.call(os.environ['ComSpec'] + "
+            "' /d /v:off /c call \\\"' + sys.argv[1] + '\\\" \\\"' + sys.argv[2] + "
+            "'\\\" \\\"an argument with spaces\\\"'))\n", encoding="utf-8")
+        command = f'call "{self.launcher}" "{driver}" "{plugin}" "{self.result}"'
+        result = subprocess.run(
+            f'"{os.environ.get("ComSpec", "cmd.exe")}" /d /v:off /c {command}',
+            cwd=self.source, env=self.environment, capture_output=True, text=True, timeout=30)
+        self.assertEqual(27, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(["an argument with spaces"], json.loads(self.result.read_text())["args"])
 
 
 if __name__ == "__main__":
