@@ -71,12 +71,88 @@ class BuildFoundationTest(unittest.TestCase):
         with self.assertRaisesRegex(build.BuildError, "Unsupported target"):
             build.load_target(self.root, "freebsd-x64")
 
+    def test_profiles_separate_outputs_and_keep_optimized_arguments(self):
+        for name in ("win-x64", "linux-x64", "mac-arm64", "mac-x64"):
+            with self.subTest(target=name):
+                dev = build.load_target(self.root, name)
+                optimized = build.load_target(self.root, name, "optimized")
+                self.assertTrue(dev["gn_args"]["is_debug"])
+                self.assertTrue(dev["gn_args"]["is_component_build"])
+                self.assertEqual(1, dev["gn_args"]["symbol_level"])
+                self.assertEqual(0, dev["gn_args"]["blink_symbol_level"])
+                self.assertEqual(0, dev["gn_args"]["v8_symbol_level"])
+                self.assertFalse(optimized["gn_args"]["is_debug"])
+                self.assertFalse(optimized["gn_args"]["is_component_build"])
+                self.assertNotIn("blink_symbol_level", optimized["gn_args"])
+                legacy = f"out/Aimium/{name}-ninja" if name == "win-x64" else f"out/Aimium/{name}"
+                self.assertEqual(self.root / legacy, build.output_directory(self.root, None, optimized))
+                self.assertNotEqual(build.output_directory(self.root, None, dev),
+                                    build.output_directory(self.root, None, optimized))
+        with self.assertRaisesRegex(build.BuildError, "Unsupported profile"):
+            build.load_target(self.root, "win-x64", "unreviewed")
+
+    def test_jobs_default_environment_and_cli_precedence(self):
+        with mock.patch.dict(build.os.environ):
+            build.os.environ.pop("AIMIUM_BUILD_JOBS", None)
+            self.assertEqual(12, build.resolve_jobs(self.target, None))
+            build.os.environ["AIMIUM_BUILD_JOBS"] = "48"
+            self.assertEqual(48, build.resolve_jobs(self.target, None))
+            self.assertEqual(12, build.resolve_jobs(self.target, 12))
+            for invalid in ("0", "-2", "many", ""):
+                build.os.environ["AIMIUM_BUILD_JOBS"] = invalid
+                with self.assertRaises(build.BuildError):
+                    build.resolve_jobs(self.target, None)
+
+    def test_dev_build_can_be_browser_only_and_verbose_without_a_test_claim(self):
+        plan = build.make_plan(self.root, self.target, self.out, self.identity, self.tools,
+                               jobs=12, verbose=True)
+        commands = {item["step"]: item["argv"] for item in plan["commands"]}
+        self.assertEqual({"generate", "compile"}, set(commands))
+        self.assertIn("-v", commands["compile"])
+        self.assertNotIn("browser_tests", commands["compile"])
+        self.assertEqual("not_run", plan["native_tests"]["status"])
+        other = build.make_plan(self.root, self.target, self.out, self.identity, self.tools, jobs=48)
+        self.assertEqual(plan["gn_args_text"], other["gn_args_text"])
+        self.assertEqual(plan["output_directory"], other["output_directory"])
+
+    def test_output_lock_prevents_overlap_and_releases_on_interruption(self):
+        self.out.mkdir(parents=True)
+        with self.assertRaisesRegex(RuntimeError, "interruption"):
+            with build.output_lock(self.out):
+                with self.assertRaisesRegex(build.BuildError, "Another Aimium build"):
+                    with build.output_lock(self.out):
+                        self.fail("Overlapping build acquired the same output")
+                plan = build.make_plan(self.root, self.target, self.out, self.identity, self.tools)
+                plan["preflight"] = {"ok": True}
+                with mock.patch.object(build.subprocess, "run") as compiler, \
+                     self.assertRaisesRegex(build.BuildError, "Another Aimium build"):
+                    build.run_build(self.root, self.out, plan)
+                compiler.assert_not_called()
+                self.assertFalse((self.out / "args.gn").exists())
+                raise RuntimeError("interruption")
+        with build.output_lock(self.out):
+            pass
+
+    def test_optimized_cache_is_not_overwritten_for_dev_profile(self):
+        self.out.mkdir(parents=True)
+        optimized = build.load_target(self.root, "linux-x64", "optimized")
+        original = build.render_gn_args(optimized["gn_args"])
+        (self.out / "args.gn").write_text(original, encoding="utf-8")
+        self.assertFalse(self.check(self.inspect(), "output_arguments")["ok"])
+        plan = build.make_plan(self.root, self.target, self.out, self.identity, self.tools)
+        plan["preflight"] = {"ok": True}
+        with mock.patch.object(build.subprocess, "run") as compiler, \
+             self.assertRaisesRegex(build.BuildError, "args.gn changed"):
+            build.run_build(self.root, self.out, plan)
+        compiler.assert_not_called()
+        self.assertEqual(original, (self.out / "args.gn").read_text(encoding="utf-8"))
+
     def test_plan_normalizes_source_and_output_aliases(self):
         # Exercise equivalent path spellings on every host, without requiring
         # Windows symlink privileges or a filesystem that exposes short names.
         (self.workspace / "alias-parent").mkdir()
         alias_root = self.workspace / "alias-parent" / ".." / "src"
-        alias_out = alias_root / "out/Aimium/linux-x64"
+        alias_out = alias_root / "out/Aimium/linux-x64-dev"
         self.assertEqual(self.root, alias_root.resolve())
         canonical_out = build.output_directory(alias_root, None, self.target)
         expected = build.make_plan(self.root, self.target, self.out, self.identity,
@@ -87,7 +163,7 @@ class BuildFoundationTest(unittest.TestCase):
                     plan = build.make_plan(root, self.target, out, self.identity,
                                            self.tools, browser_tests=True)
                     self.assertEqual(expected, plan)
-        self.assertIn("out/Aimium/linux-x64", expected["commands"][0]["argv"])
+        self.assertIn("out/Aimium/linux-x64-dev", expected["commands"][0]["argv"])
         self.assertFalse(self.out.exists())
 
     def test_plan_normalizes_symlinked_source_aliases(self):
@@ -248,8 +324,9 @@ class BuildFoundationTest(unittest.TestCase):
     def test_failed_gn_stops_before_compilation_and_records_failure(self):
         plan = build.make_plan(self.root, self.target, self.out, self.identity, self.tools)
         plan["preflight"] = {"ok": True}
+        progress = io.StringIO()
         with mock.patch.object(build.subprocess, "run", return_value=SimpleNamespace(returncode=7)) as run, \
-             contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+             contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(progress):
             code = build.run_build(self.root, self.out, plan)
         self.assertEqual(1, code)
         self.assertEqual(1, run.call_count)
@@ -257,6 +334,8 @@ class BuildFoundationTest(unittest.TestCase):
         self.assertEqual("failed", receipt["status"])
         self.assertEqual([{"step": "generate", "exit_code": 7}], receipt["step_results"])
         self.assertFalse(receipt["release_eligible"])
+        self.assertIn("Starting generate", progress.getvalue())
+        self.assertNotIn("Starting compile", progress.getvalue())
 
     def test_successful_commands_without_browser_are_not_a_successful_build(self):
         plan = build.make_plan(self.root, self.target, self.out, self.identity, self.tools)

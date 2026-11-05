@@ -18,7 +18,7 @@ Die Chromium-Basis ist ein Entwicklungsstand, keine verifizierte Stable-Basis.
 | --- | --- | --- |
 | Aimium-WebUI | Featuregeschützte `chrome://aimium`-Foundationseite und beide Feature-an/aus-Smoke-Tests | Vollständige native Kompilierung, Ressourcenerzeugung und ausgeführte Browsertests |
 | Datenverträge | Versionierte Schemata, synthetische Beispiele, Python-Referenzvalidator und Tests | Produktiver Store, Laufzeit und native Durchsetzung |
-| Buildwerkzeuge | Planung, Vorchecks, lokale Buildbefehle, Source-Identität und getrennte native Testresultate | Vollständige native Plattformnachweise |
+| Buildwerkzeuge | Profile `dev`/`optimized`, zwölf konfigurierbare Jobs, sichtbare Phasen und Verbose-Ausgabe, Vorchecks, Outdir-Sperre, Source-Identität und getrennte native Testresultate | Native Validierung der neuen Profile und vollständige Plattformnachweise |
 | VS-Code-Aufgaben | Nutzerseitiger Build-/Smoke-Start, Vorchecks, Dry-run sowie lokale Python- und Vertragsprüfungen | Tatsächlich ausgeführter nativer Build und Browserprüfung |
 | Sitzungspaare | Produktanforderungen und Vertragsgrundlage | Native Agentenfläche, dauerhafte Workspaces, Profil-/Tabbindung und Wiederherstellung |
 | KI und Browseraktionen | Verträge und Architekturgrenzen | Connectoraufrufe, Schlüsselspeicher, Browseraktionsdienst und Seitenwissen |
@@ -48,16 +48,23 @@ auf diese Matrix.
 
 Prüfungen und Builds erfolgen lokal. GitHub Actions sind deaktiviert; vorhandene
 Workflowdateien stellen keinen aktuellen Prüfnachweis dar. Native Builds startet
-ausschließlich der Nutzer in VS Code. Agenten starten oder wiederholen keine
-nativen Builds, GN-Generierung, Compiler oder Linker.
+ausschließlich der Nutzer in VS Code oder im Terminal. Agenten starten oder
+wiederholen keine nativen Builds, GN-Generierung, Compiler oder Linker.
 
 Der vollständige Quellroot `src` und eine passende lokale Buildumgebung sind
-Voraussetzung. Die Standardaufgabe
-**Aimium: Build + Smoke (lokal)** baut den Browser und die fokussierten
-Aimium-Browsertests und führt nach erfolgreichem Build die Tests aus.
+Voraussetzung. Die Standardaufgabe **Aimium: Browser bauen (lokal)** baut nur
+den Browser im Profil `dev`, mit zwölf übersteuerbaren Jobs. Für native Abnahme
+ist ausdrücklich **Aimium: Build + Smoke (lokal)** nötig: Sie baut zusätzlich
+das Testbinary und führt die fokussierten Aimium-Tests aus.
 Normale Website-Navigation bleibt eine separate Prüfung.
 Details: [Entwicklungsleitfaden](development.md) und
 [VS-Code-Aufgaben](../../.vscode/tasks.json).
+
+Die Werkzeugumstellung ist durch lokale Prüfungen abgesichert: 74 Python-Tests,
+71 bestanden und drei Windows-Symlink-Prüfungen übersprungen; acht Vertragsbeispiele
+bestanden. Es wurde dafür kein neuer nativer Build ausgeführt. Die erstmalige Umstellung
+von statisch/optimiert auf Debug/Component benötigt einen eigenen Zwischenstand.
+Der alte optimierte Ausgabeordner wird nicht gelöscht oder umkonfiguriert.
 
 Source-Identität, Werkzeug-/Abhängigkeitsstand, GN-Argumente, Befehle und
 unveränderte Ergebnisse gehören in lokale Buildbelege. Rohlogs, Browserprofile,

@@ -1,95 +1,450 @@
 {
   "version": "2.0.0",
-  "options": {"cwd": "${workspaceFolder}"},
-  "presentation": {"reveal": "always", "panel": "dedicated", "focus": false},
+  "options": {
+    "cwd": "${workspaceFolder}"
+  },
+  "presentation": {
+    "reveal": "always",
+    "panel": "dedicated",
+    "focus": false
+  },
   "windows": {
     "options": {
       "cwd": "${workspaceFolder}",
-      "shell": {"executable": "${env:ComSpec}", "args": ["/d", "/v:off", "/c"]}
+      "shell": {
+        "executable": "${env:ComSpec}",
+        "args": [
+          "/d",
+          "/v:off",
+          "/c"
+        ]
+      }
     }
   },
   "tasks": [
     {
+      "label": "Aimium: Browser bauen (lokal)",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/aimium/tools/build.py",
+        "build",
+        "--target",
+        "linux-x64",
+        "--profile",
+        "${input:aimiumProfile}",
+        "--jobs",
+        "${input:aimiumJobs}",
+        "--min-free-gib",
+        "${input:aimiumMinFreeGiB}"
+      ],
+      "windows": {
+        "args": [
+          "${workspaceFolder}\\aimium\\tools\\python.cmd",
+          "${workspaceFolder}\\aimium\\tools\\build.py",
+          "build",
+          "--target",
+          "win-x64",
+          "--profile",
+          "${input:aimiumProfile}",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}"
+        ],
+        "command": "call"
+      },
+      "osx": {
+        "args": [
+          "${workspaceFolder}/aimium/tools/build.py",
+          "build",
+          "--target",
+          "${input:aimiumMacTarget}",
+          "--profile",
+          "${input:aimiumProfile}",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}"
+        ]
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "problemMatcher": [
+        "$gcc",
+        "$msCompile"
+      ],
+      "group": {
+        "isDefault": true,
+        "kind": "build"
+      }
+    },
+    {
       "label": "Aimium: Build + Smoke (lokal)",
       "type": "shell",
       "command": "python3",
-      "args": ["${workspaceFolder}/aimium/tools/build.py", "build", "--target", "linux-x64", "--browser-tests", "--jobs", "${input:aimiumJobs}"],
+      "args": [
+        "${workspaceFolder}/aimium/tools/build.py",
+        "build",
+        "--target",
+        "linux-x64",
+        "--profile",
+        "${input:aimiumProfile}",
+        "--jobs",
+        "${input:aimiumJobs}",
+        "--min-free-gib",
+        "${input:aimiumMinFreeGiB}",
+        "--browser-tests"
+      ],
       "windows": {
-        "command": "call",
-        "args": ["${workspaceFolder}\\aimium\\tools\\python.cmd", "${workspaceFolder}\\aimium\\tools\\build.py", "build", "--target", "win-x64", "--browser-tests", "--jobs", "${input:aimiumJobs}", "--out-dir", "out/Aimium/win-x64-ninja"]
+        "args": [
+          "${workspaceFolder}\\aimium\\tools\\python.cmd",
+          "${workspaceFolder}\\aimium\\tools\\build.py",
+          "build",
+          "--target",
+          "win-x64",
+          "--profile",
+          "${input:aimiumProfile}",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}",
+          "--browser-tests"
+        ],
+        "command": "call"
       },
       "osx": {
-        "args": ["${workspaceFolder}/aimium/tools/build.py", "build", "--target", "${input:aimiumMacTarget}", "--browser-tests", "--jobs", "${input:aimiumJobs}"]
+        "args": [
+          "${workspaceFolder}/aimium/tools/build.py",
+          "build",
+          "--target",
+          "${input:aimiumMacTarget}",
+          "--profile",
+          "${input:aimiumProfile}",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}",
+          "--browser-tests"
+        ]
       },
-      "group": {"kind": "build", "isDefault": true},
-      "runOptions": {"instanceLimit": 1},
-      "problemMatcher": ["$gcc", "$msCompile"]
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "problemMatcher": [
+        "$gcc",
+        "$msCompile"
+      ]
+    },
+    {
+      "label": "Aimium: Browser bauen (ausführlich)",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/aimium/tools/build.py",
+        "build",
+        "--target",
+        "linux-x64",
+        "--profile",
+        "${input:aimiumProfile}",
+        "--jobs",
+        "${input:aimiumJobs}",
+        "--min-free-gib",
+        "${input:aimiumMinFreeGiB}",
+        "--verbose"
+      ],
+      "windows": {
+        "args": [
+          "${workspaceFolder}\\aimium\\tools\\python.cmd",
+          "${workspaceFolder}\\aimium\\tools\\build.py",
+          "build",
+          "--target",
+          "win-x64",
+          "--profile",
+          "${input:aimiumProfile}",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}",
+          "--verbose"
+        ],
+        "command": "call"
+      },
+      "osx": {
+        "args": [
+          "${workspaceFolder}/aimium/tools/build.py",
+          "build",
+          "--target",
+          "${input:aimiumMacTarget}",
+          "--profile",
+          "${input:aimiumProfile}",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}",
+          "--verbose"
+        ]
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "problemMatcher": [
+        "$gcc",
+        "$msCompile"
+      ]
+    },
+    {
+      "label": "Aimium: Optimierten Build fortsetzen",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/aimium/tools/build.py",
+        "build",
+        "--target",
+        "linux-x64",
+        "--profile",
+        "optimized",
+        "--jobs",
+        "${input:aimiumJobs}",
+        "--min-free-gib",
+        "${input:aimiumMinFreeGiB}"
+      ],
+      "windows": {
+        "args": [
+          "${workspaceFolder}\\aimium\\tools\\python.cmd",
+          "${workspaceFolder}\\aimium\\tools\\build.py",
+          "build",
+          "--target",
+          "win-x64",
+          "--profile",
+          "optimized",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}"
+        ],
+        "command": "call"
+      },
+      "osx": {
+        "args": [
+          "${workspaceFolder}/aimium/tools/build.py",
+          "build",
+          "--target",
+          "${input:aimiumMacTarget}",
+          "--profile",
+          "optimized",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}"
+        ]
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "problemMatcher": [
+        "$gcc",
+        "$msCompile"
+      ]
     },
     {
       "label": "Aimium: Voraussetzungen prüfen",
       "type": "shell",
       "command": "python3",
-      "args": ["${workspaceFolder}/aimium/tools/build.py", "check", "--target", "linux-x64", "--browser-tests"],
+      "args": [
+        "${workspaceFolder}/aimium/tools/build.py",
+        "check",
+        "--target",
+        "linux-x64",
+        "--profile",
+        "${input:aimiumProfile}",
+        "--jobs",
+        "${input:aimiumJobs}",
+        "--min-free-gib",
+        "${input:aimiumMinFreeGiB}"
+      ],
       "windows": {
-        "command": "call",
-        "args": ["${workspaceFolder}\\aimium\\tools\\python.cmd", "${workspaceFolder}\\aimium\\tools\\build.py", "check", "--target", "win-x64", "--browser-tests", "--out-dir", "out/Aimium/win-x64-ninja"]
+        "args": [
+          "${workspaceFolder}\\aimium\\tools\\python.cmd",
+          "${workspaceFolder}\\aimium\\tools\\build.py",
+          "check",
+          "--target",
+          "win-x64",
+          "--profile",
+          "${input:aimiumProfile}",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}"
+        ],
+        "command": "call"
       },
       "osx": {
-        "args": ["${workspaceFolder}/aimium/tools/build.py", "check", "--target", "${input:aimiumMacTarget}", "--browser-tests"]
+        "args": [
+          "${workspaceFolder}/aimium/tools/build.py",
+          "check",
+          "--target",
+          "${input:aimiumMacTarget}",
+          "--profile",
+          "${input:aimiumProfile}",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}"
+        ]
       },
-      "problemMatcher": []
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "problemMatcher": [
+        "$gcc",
+        "$msCompile"
+      ]
     },
     {
       "label": "Aimium: Buildplan prüfen",
       "type": "shell",
       "command": "python3",
-      "args": ["${workspaceFolder}/aimium/tools/build.py", "build", "--target", "linux-x64", "--browser-tests", "--jobs", "${input:aimiumJobs}", "--dry-run"],
+      "args": [
+        "${workspaceFolder}/aimium/tools/build.py",
+        "build",
+        "--target",
+        "linux-x64",
+        "--profile",
+        "${input:aimiumProfile}",
+        "--jobs",
+        "${input:aimiumJobs}",
+        "--min-free-gib",
+        "${input:aimiumMinFreeGiB}",
+        "--dry-run"
+      ],
       "windows": {
-        "command": "call",
-        "args": ["${workspaceFolder}\\aimium\\tools\\python.cmd", "${workspaceFolder}\\aimium\\tools\\build.py", "build", "--target", "win-x64", "--browser-tests", "--jobs", "${input:aimiumJobs}", "--out-dir", "out/Aimium/win-x64-ninja", "--dry-run"]
+        "args": [
+          "${workspaceFolder}\\aimium\\tools\\python.cmd",
+          "${workspaceFolder}\\aimium\\tools\\build.py",
+          "build",
+          "--target",
+          "win-x64",
+          "--profile",
+          "${input:aimiumProfile}",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}",
+          "--dry-run"
+        ],
+        "command": "call"
       },
       "osx": {
-        "args": ["${workspaceFolder}/aimium/tools/build.py", "build", "--target", "${input:aimiumMacTarget}", "--browser-tests", "--jobs", "${input:aimiumJobs}", "--dry-run"]
+        "args": [
+          "${workspaceFolder}/aimium/tools/build.py",
+          "build",
+          "--target",
+          "${input:aimiumMacTarget}",
+          "--profile",
+          "${input:aimiumProfile}",
+          "--jobs",
+          "${input:aimiumJobs}",
+          "--min-free-gib",
+          "${input:aimiumMinFreeGiB}",
+          "--dry-run"
+        ]
       },
-      "problemMatcher": []
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "problemMatcher": [
+        "$gcc",
+        "$msCompile"
+      ]
     },
     {
       "label": "Aimium: Python-Tests (lokal)",
       "type": "shell",
       "command": "python3",
-      "args": ["-m", "unittest", "discover", "-s", "aimium/tests", "-v"],
+      "args": [
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "aimium/tests",
+        "-v"
+      ],
       "windows": {
         "command": "call",
-        "args": ["${workspaceFolder}\\aimium\\tools\\python.cmd", "-m", "unittest", "discover", "-s", "aimium/tests", "-v"]
+        "args": [
+          "${workspaceFolder}\\aimium\\tools\\python.cmd",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "aimium/tests",
+          "-v"
+        ]
       },
-      "group": {"kind": "test", "isDefault": true},
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
       "problemMatcher": []
     },
     {
       "label": "Aimium: Vertragsbeispiele (lokal)",
       "type": "shell",
       "command": "python3",
-      "args": ["${workspaceFolder}/aimium/contracts/validate.py", "--examples"],
+      "args": [
+        "${workspaceFolder}/aimium/contracts/validate.py",
+        "--examples"
+      ],
       "windows": {
         "command": "call",
-        "args": ["${workspaceFolder}\\aimium\\tools\\python.cmd", "${workspaceFolder}\\aimium\\contracts\\validate.py", "--examples"]
+        "args": [
+          "${workspaceFolder}\\aimium\\tools\\python.cmd",
+          "${workspaceFolder}\\aimium\\contracts\\validate.py",
+          "--examples"
+        ]
       },
       "problemMatcher": []
     }
   ],
   "inputs": [
     {
-      "id": "aimiumJobs",
       "type": "pickString",
-      "description": "Parallele Compileraufträge; gleicher Ausgabeordner und Ninja-Cache bleiben erhalten.",
-      "options": ["4", "8", "2", "1", "12", "16"],
-      "default": "4"
+      "default": "dev",
+      "description": "dev: Debug/Component für Entwicklung; optimized: bisherigen statischen Zwischenstand fortsetzen.",
+      "options": [
+        "dev",
+        "optimized"
+      ],
+      "id": "aimiumProfile"
+    },
+    {
+      "type": "promptString",
+      "description": "Parallele Jobs auf diesem Buildrechner; positive Zahl, für stärkere Rechner anpassbar.",
+      "default": "12",
+      "id": "aimiumJobs"
+    },
+    {
+      "type": "promptString",
+      "description": "Mindestplatz beim Vorcheck in GiB; verfügbare Kapazität und Buildreserve vorher prüfen.",
+      "default": "100",
+      "id": "aimiumMinFreeGiB"
     },
     {
       "id": "aimiumMacTarget",
       "type": "pickString",
       "description": "Native Architektur dieses Macs (keine Cross-Plattform-Abnahme).",
-      "options": [{"label": "Apple Silicon", "value": "mac-arm64"}, {"label": "Intel", "value": "mac-x64"}],
+      "options": [
+        {
+          "label": "Apple Silicon",
+          "value": "mac-arm64"
+        },
+        {
+          "label": "Intel",
+          "value": "mac-x64"
+        }
+      ],
       "default": "mac-arm64"
     }
   ]

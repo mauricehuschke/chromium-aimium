@@ -1,6 +1,21 @@
 {
   "schema_version": 1,
   "build_kind": "development",
+  "default_profile": "dev",
+  "default_jobs": 12,
+  "profiles": {
+    "dev": {
+      "gn_args": {
+        "is_debug": true,
+        "is_component_build": true,
+        "blink_symbol_level": 0,
+        "v8_symbol_level": 0
+      }
+    },
+    "optimized": {
+      "gn_args": {}
+    }
+  },
   "common_gn_args": {
     "is_debug": false,
     "is_component_build": false,

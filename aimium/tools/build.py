@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -55,13 +56,23 @@ def read_json(path):
         raise BuildError(f"Cannot read {path}: {exc}") from exc
 
 
-def load_target(root, name):
+def load_target(root, name, profile=None):
     config = read_json(root / "aimium/build/targets.json")
     if name not in config["targets"]:
         raise BuildError(f"Unsupported target {name!r}; choose {', '.join(config['targets'])}.")
     target = dict(config["targets"][name])
     target["id"] = name
+    profile = profile or config["default_profile"]
+    if profile not in config["profiles"]:
+        raise BuildError(f"Unsupported profile {profile!r}; choose {', '.join(config['profiles'])}.")
+    target["profile"] = profile
+    target["default_jobs"] = config["default_jobs"]
+    # Keep the previous optimized paths/arguments available for cache reuse.
+    target["default_output"] = (f"out/Aimium/{name}-dev" if profile == "dev" else
+                                f"out/Aimium/{name}-ninja" if name == "win-x64" else
+                                f"out/Aimium/{name}")
     arguments = dict(config["common_gn_args"], **target.get("gn_args", {}))
+    arguments.update(config["profiles"][profile]["gn_args"])
     arguments.update(target_os=target["target_os"], target_cpu=target["target_cpu"])
     target["gn_args"] = arguments
     return target
@@ -75,7 +86,7 @@ def render_gn_args(arguments):
 
 def output_directory(root, value, target):
     root = root.resolve()
-    relative = Path(value or f"out/Aimium/{target['id']}")
+    relative = Path(value or target["default_output"])
     if relative.is_absolute() or ".." in relative.parts:
         raise BuildError("--out-dir must be a relative directory below out/ without '..'.")
     result = (root / relative).resolve()
@@ -268,7 +279,15 @@ def _git_config_present(root, name):
     return result.returncode == 0
 
 
-def make_plan(root, target, out, identity, tools, jobs=None, browser_tests=False):
+def resolve_jobs(target, jobs):
+    value = jobs if jobs is not None else os.environ.get("AIMIUM_BUILD_JOBS", target["default_jobs"])
+    try:
+        return positive_integer(str(value))
+    except (ValueError, argparse.ArgumentTypeError) as exc:
+        raise BuildError("Compiler jobs must be a positive integer (--jobs or AIMIUM_BUILD_JOBS).") from exc
+
+
+def make_plan(root, target, out, identity, tools, jobs=None, browser_tests=False, verbose=False):
     # Both paths must use the same spelling before relative_to(): resolving
     # just the output expands Windows short names and macOS /var symlinks.
     root = root.resolve()
@@ -276,9 +295,10 @@ def make_plan(root, target, out, identity, tools, jobs=None, browser_tests=False
     gn = tools["gn"] or str(root / target["gn_binary"])
     autoninja = tools["autoninja"] or "<depot_tools>/autoninja.py"
     relative = out.relative_to(root).as_posix()
-    compile_args = [sys.executable, autoninja, "-C", relative]
-    if jobs is not None:
-        compile_args += ["-j", str(jobs)]
+    jobs = resolve_jobs(target, jobs)
+    compile_args = [sys.executable, autoninja, "-C", relative, "-j", str(jobs)]
+    if verbose:
+        compile_args.append("-v")
     compile_args.append("chrome")
     if browser_tests:
         compile_args.append("browser_tests")
@@ -307,6 +327,9 @@ def make_plan(root, target, out, identity, tools, jobs=None, browser_tests=False
         "schema_version": 1,
         "status": "planned",
         "target": target["id"],
+        "profile": target["profile"],
+        "jobs": jobs,
+        "verbose": verbose,
         "build_kind": "development",
         "release_eligible": False,
         "source": identity,
@@ -380,10 +403,42 @@ def browser_test_results(path, discovered):
     return results
 
 
+@contextlib.contextmanager
+def output_lock(out):
+    """Use an OS lock shared by terminal and editor builds; exits release it."""
+    with (out / ".aimium-build.lock").open("a+b") as stream:
+        if stream.tell() == 0:
+            stream.write(b"\0")
+            stream.flush()
+        stream.seek(0)
+        try:
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            raise BuildError("Another Aimium build owns this output directory; wait for it to exit.") from exc
+        try:
+            yield
+        finally:
+            stream.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+
 def run_build(root, out, plan):
     if not plan.get("preflight", {}).get("ok"):
         raise BuildError("Build requires a successful preflight.")
     out.mkdir(parents=True, exist_ok=True)
+    with output_lock(out):
+        return _run_build_locked(root, out, plan)
+
+
+def _run_build_locked(root, out, plan):
     args_file = out / "args.gn"
     if args_file.exists():
         if args_file.read_text(encoding="utf-8") != plan["gn_args_text"]:
@@ -393,6 +448,9 @@ def run_build(root, out, plan):
             stream.write(plan["gn_args_text"])
     plan["status"] = "running"
     plan["started_at"] = datetime.now(timezone.utc).isoformat()
+    print(f"[Aimium] {plan['target']} / {plan['profile']} / {plan['jobs']} jobs",
+          file=sys.stderr, flush=True)
+    print("[Aimium] Recording tool identities...", file=sys.stderr, flush=True)
     plan["tool_sha256"] = {name: file_hash(Path(value)) if value else None for name, value in plan["tools"].items()}
     plan["python"] = {"executable": sys.executable, "version": platform.python_version()}
     depot = Path(plan["tools"]["gclient"]).resolve().parent if plan["tools"]["gclient"] else None
@@ -408,6 +466,9 @@ def run_build(root, out, plan):
     exit_code = 1
     try:
         for command in plan["commands"]:
+            print(f"[Aimium] Starting {command['step']}...", file=sys.stderr, flush=True)
+            if plan.get("verbose"):
+                print(json.dumps(command["argv"], ensure_ascii=False), file=sys.stderr, flush=True)
             capture = command["step"] == "list_aimium_tests"
             if command["step"] == "run_aimium_tests":
                 summary = out / "aimium-browser-tests.json"
@@ -418,6 +479,8 @@ def run_build(root, out, plan):
             result = subprocess.run(command["argv"], cwd=root, env=environment, check=False,
                                     capture_output=capture, text=capture)
             plan["step_results"].append({"step": command["step"], "exit_code": result.returncode})
+            print(f"[Aimium] {command['step']} exited with {result.returncode}.",
+                  file=sys.stderr, flush=True)
             if capture and result.returncode:
                 print(result.stdout, end="")
                 print(result.stderr, end="", file=sys.stderr)
@@ -469,21 +532,31 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("plan", "check", "build"))
     parser.add_argument("--target", required=True, help="linux-x64, win-x64, mac-arm64 or mac-x64")
+    parser.add_argument("--profile", choices=("dev", "optimized"),
+                        help="dev (default): debug/component; optimized: previous static configuration")
     parser.add_argument("--source-root", type=Path, default=SOURCE_ROOT)
-    parser.add_argument("--out-dir", help="relative path below out/; default out/Aimium/<target>")
-    parser.add_argument("--jobs", type=positive_integer, help="optional compiler job limit")
+    parser.add_argument("--out-dir", help="relative path below out/; defaults to a separate directory for the selected profile")
+    parser.add_argument("--jobs", type=positive_integer,
+                        help="parallel jobs; overrides AIMIUM_BUILD_JOBS, otherwise default 12")
+    parser.add_argument("--verbose", action="store_true", help="show command arguments and verbose compiler commands")
     parser.add_argument("--min-free-gib", type=positive_integer, default=MIN_FREE_GIB)
     parser.add_argument("--browser-tests", action="store_true", help="also build browser_tests and run only AimiumUI* tests (Linux requires Xvfb)")
     parser.add_argument("--dry-run", action="store_true", help="perform checks and print the plan without writing files")
     options = parser.parse_args(argv)
     try:
         root = options.source_root.resolve()
-        target = load_target(root, options.target)
+        target = load_target(root, options.target, options.profile)
         out = output_directory(root, options.out_dir, target)
-        identity = source_identity(root)
-        tools = tool_paths(root, target)
-        plan = make_plan(root, target, out, identity, tools, options.jobs, options.browser_tests)
         if options.command != "plan":
+            print("[Aimium] Checking source identity...", file=sys.stderr, flush=True)
+        identity = source_identity(root)
+        if options.command != "plan":
+            print("[Aimium] Locating tools...", file=sys.stderr, flush=True)
+        tools = tool_paths(root, target)
+        plan = make_plan(root, target, out, identity, tools, options.jobs, options.browser_tests,
+                         options.verbose)
+        if options.command != "plan":
+            print("[Aimium] Checking native prerequisites...", file=sys.stderr, flush=True)
             plan["preflight"] = preflight(root, target, out, identity, tools, options.min_free_gib,
                                           browser_tests=options.browser_tests)
         if options.command == "build" and not options.dry_run and plan["preflight"]["ok"]:

@@ -37,7 +37,7 @@ Browsernavigation sind noch nicht bestätigt. Die native Abnahme bleibt offen,
 `release_eligible: false`.
 
 Projektprüfungen werden lokal ausgeführt; GitHub Actions sind deaktiviert.
-Künftige native Builds startet ausschließlich der Nutzer in VS Code;
+Künftige native Builds startet ausschließlich der Nutzer in VS Code oder im Terminal;
 Agenten starten keine Builds.
 
 ## In VS Code weiterarbeiten
@@ -53,17 +53,20 @@ Aimium-Erweiterungen nicht.
 
 Mit den Aufgaben aus [`.vscode/tasks.json`](.vscode/tasks.json) startet
 **Strg+Umschalt+B** (macOS: **Cmd+Umschalt+B**) die Standardaufgabe
-**Aimium: Build + Smoke (lokal)**.
+**Aimium: Browser bauen (lokal)** mit dem Profil `dev` und zwölf parallelen Jobs.
+**Aimium: Build + Smoke (lokal)** bleibt eine eigene Aufgabe für die native Abnahme.
 Weitere Aufgaben sind **Aimium: Voraussetzungen prüfen**,
 **Aimium: Buildplan prüfen**, **Aimium: Python-Tests (lokal)** und
 **Aimium: Vertragsbeispiele (lokal)**. Eine Microsoft-Python-Erweiterung ist
 dafür nicht erforderlich.
 
 Die [lokale Buildanleitung](aimium/README.md#lokaler-build-in-vs-code) erklärt
-Voraussetzungen, Python 3.11+, die optionale lokale `env.cmd` und die
-Wiederverwendung von `out/Aimium/win-x64-ninja`. Die Standardaufgabe
-kompiliert tatsächlich und führt danach die fokussierten nativen Smoke-Tests
-aus; sie prüft normale Website-Navigation nicht automatisch.
+Voraussetzungen, Python 3.11+, die optionale lokale `env.cmd`,
+die Profile `dev` und `optimized` sowie die Wiederverwendung vorhandener
+Ninja-Ausgaben. `dev` nutzt einen eigenen Ausgabeordner und braucht bei der
+ersten Umstellung viele neue Objekte; der bisherige optimierte Zwischenstand
+bleibt erhalten. Der tägliche Standard baut nur den Browser. Native Smoke-Tests
+und normale Website-Navigation bleiben gesonderte Abnahmegates.
 
 Zum Projekt: [Leitfaden](aimium/README.md),
 [bestätigte Vision](aimium/docs/product-vision.md),

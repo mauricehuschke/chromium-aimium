@@ -57,8 +57,9 @@ caches and clones. Do not reintroduce pre-cleanup history by merging old clones.
 Tests and builds stay local. GitHub Actions
 is disabled for this repository; preserve the existing completed runs and logs.
 Do not enable, dispatch or rerun Actions without a new explicit owner request.
-The owner starts native builds from VS Code when needed. Agents must not start
-or restart native builds, GN generation, compilers or linkers on their own.
+The owner starts native builds from VS Code or a terminal when needed.
+Agents must not start or restart native builds, GN generation, compilers or
+linkers on their own.
 Lightweight local unit/contract checks remain available for relevant changes.
 Preserve the existing Ninja output directory and valid intermediate results;
 never clean them merely to restart a build. Record unexecuted native checks as

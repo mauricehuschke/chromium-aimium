@@ -4,7 +4,7 @@
 
 Prüfungen und Builds erfolgen lokal. GitHub Actions sind deaktiviert; vorhandene
 Workflowdefinitionen dürfen nicht als ausgeführte Prüfung gelten.
-Native Builds startet ausschließlich der Nutzer in VS Code. Agenten starten
+Native Builds startet ausschließlich der Nutzer in VS Code oder im Terminal. Agenten starten
 oder wiederholen keine nativen Builds, GN-Generierung, Compiler oder Linker.
 Leichte lokale Python- und Vertragsprüfungen bleiben für passende Änderungen
 verfügbar. Es gibt keinen automatischen Buildstart beim Öffnen des Projekts.
@@ -61,106 +61,78 @@ Systemabhängigkeiten sowie für Browsertests die grafische Testumgebung.
 Der Vorcheck fordert standardmäßig mindestens 100 GiB freien Platz.
 Das ist eine Mindestprüfung, keine Vorhersage der endgültigen Buildgröße.
 
-## VS-Code-Aufgaben
+## Profile, VS Code und Buildrechner
 
-Die Aufgaben in [tasks.json](../../.vscode/tasks.json) verwenden VS-Code-Bordmittel;
-eine Microsoft-Python-Erweiterung ist nicht erforderlich.
+Die [lokale Buildanleitung](../README.md#lokaler-build-in-vs-code) ist der
+vollständige Einstieg für VS Code, PowerShell und weitere Buildrechner.
 
-| Aufgabe | Wirkung |
+| Auswahl | Verhalten |
 | --- | --- |
-| **Aimium: Build + Smoke (lokal)** | Browser und `browser_tests` bauen; danach die fokussierten Aimium-Tests ausführen |
-| **Aimium: Voraussetzungen prüfen** | Native Umgebung prüfen, ohne zu kompilieren |
-| **Aimium: Buildplan prüfen** | Vorcheck und Dry-run, ohne zu kompilieren |
-| **Aimium: Python-Tests (lokal)** | Lokale Referenz-/Werkzeugtests |
-| **Aimium: Vertragsbeispiele (lokal)** | Synthetische Verträge validieren |
+| `--profile dev` (Standard) | Debug-/Component-Build; `symbol_level=1`, Blink-/V8-Symbole aus |
+| `--profile optimized` | Bisherige optimierte statische Konfiguration unverändert |
+| `--jobs 12` | Standard; CLI vor `AIMIUM_BUILD_JOBS` vor Projektvorgabe |
+| `--verbose` | Wrapper-Befehle und ausführliche Ninja-Kompilierbefehle |
+| `--browser-tests` | Zusätzlich großes Testbinary bauen und beide Aimium-Smokes prüfen |
+| `--min-free-gib` | Positiver Mindestwert freien Platzes beim Vorcheck; Standard 100 |
 
-Der Nutzer startet den Standardbuild mit Strg+Umschalt+B auf Windows/Linux
-oder Cmd+Umschalt+B auf macOS. Die Buildaufgaben bieten eine Jobauswahl mit
-Standard vier; acht und weitere Grenzen sind auswählbar. Unter macOS muss die
-Zielauswahl `mac-arm64` für Apple Silicon oder `mac-x64` für Intel zum
-Host passen; Linux verwendet `linux-x64`.
+Vorgaben: [targets.json](../build/targets.json).
+`dev` verwendet `out/Aimium/<target>-dev`.
+`optimized` behält Windows `out/Aimium/win-x64-ninja` und sonst
+`out/Aimium/<target>`. Windows verwendet weiterhin lokalen Ninja-Betrieb.
 
-Windows-Aufgaben verwenden [python.cmd](../tools/python.cmd). Der Helper kann
-eine optionale `env.cmd` aus dem äußeren Workspace laden.
-`AIMIUM_LOCAL_ENV` wählt ausdrücklich eine andere lokale Umgebungsdatei;
-eine fehlende explizit ausgewählte Datei ist ein Fehler. `AIMIUM_PYTHON`
-bestimmt den Interpreter, `AIMIUM_DEPOT_TOOLS` das depot_tools-Verzeichnis
-für den Taskprozess. Ohne solche Einstellungen muss die benötigte Umgebung
-bereits verfügbar sein. Linux/macOS verwenden `python3` aus PATH.
-Auf allen Plattformen ist Python 3.11+ erforderlich.
+Der erstmalige Profilwechsel braucht viele neue Objekte und zusätzlichen Platz;
+er verspricht keinen sofortigen Restzeitgewinn. Alte Ausgaben bleiben erhalten.
+Nicht verschiedene Profile in denselben Outdir schreiben oder gültige Caches
+nur zum Fortsetzen löschen. Die festen Profile enthalten keine allgemeinen
+Compileroptionen für beliebige Debugging-Anforderungen.
 
-Der Windows-Launcher bindet auch nachgelagerte `python3`-Batchaufrufe an den
-gewählten Interpreter. Dafür setzt er einen prozesslokalen Shim vor den übrigen
-PATH; globale PATH-Einstellungen und Windows-App-Ausführungsaliase bleiben gleich.
+Strg+Umschalt+B beziehungsweise Cmd+Umschalt+B startet
+**Aimium: Browser bauen (lokal)**, ohne Testbinary. Für Abnahme und passende
+Codeänderungen ausdrücklich **Aimium: Build + Smoke (lokal)** verwenden.
+Weitere Aufgaben prüfen Voraussetzungen/Plan, bauen ausführlich, setzen das
+optimierte Profil fort oder prüfen Python-/Vertragswerkzeuge.
+Jobs (Vorgabe zwölf) und Mindestplatz sind frei eingebbar, Profile auswählbar.
+macOS verlangt die passende native Architektur. Kein Start beim Projektöffnen;
+keine Python-Erweiterung erforderlich.
 
-Lokale Konfiguration bleibt außerhalb der veröffentlichten Quelldateien.
-Credentials, persönliche Pfade, CA-Bundles und Maschineninventare gehören nicht
-ins Repository.
+Der Windows-[Launcher](../tools/python.cmd) lädt optional die private äußere
+`env.cmd` oder `AIMIUM_LOCAL_ENV`.
+`AIMIUM_PYTHON` und `AIMIUM_DEPOT_TOOLS` wählen lokale Werkzeuge ohne
+globale PATH-/App-Alias-Änderungen. Nachgelagerte `python3`-Batchaufrufe
+verwenden denselben Interpreter. Linux/macOS verwenden `python3`,
+überall Python 3.11+.
 
-## Buildbefehle und Source-Konsistenz
+## Source-Konsistenz und Wiederverwendung
 
-`build.py` bietet unterschiedliche Prüftiefen:
+`plan` liest die Quellenidentität und beschreibt Befehle ohne GN-Generierung.
+`check` und `build --dry-run` prüfen ohne Kompilierung.
+Nur der Nutzer startet `build` nach bestandenem Vorcheck auf sauberem,
+committetem Quellstand. Das Tool synchronisiert, installiert, committet und
+wechselt keine Quellen. Es überschreibt keine inkompatiblen `args.gn`.
 
-| Aufruf | Verhalten |
-| --- | --- |
-| `plan` | Source-/Zielplan ausgeben; keine GN-Generierung und keine Kompilierung |
-| `check` | Voraussetzungen prüfen; keine Kompilierung |
-| `build --dry-run` | Vorcheck und vollständigen Befehlsplan ausgeben; keine Kompilierung |
-| `build` | Nach bestandenem Vorcheck GN und Compiler starten |
-| `build --browser-tests` | Zusätzlich `browser_tests` bauen und die fokussierten Aimium-Tests ausführen |
+Die Betriebssystem-Sperre `.aimium-build.lock` verhindert zwei Wrapper-Builds
+im selben Outdir. Prozessende gibt sie frei, die kleine Datei darf liegen bleiben.
+Direkte Ninja-Aufrufe umgehen die Sperre.
 
-Die echten Buildaufrufe sind ausschließlich für den Nutzer im integrierten
-VS-Code-Terminal des vollständigen Quellroots vorgesehen.
+Ninja prüft Source-/DEPS-, Toolchain- und Befehlsänderungen.
+Plattformen, Architekturen und inkompatible Konfigurationen brauchen eigene
+Ausgaben. Jobs und Verbose-Ausgabe ändern keine GN-Argumente.
+Abgebrochene Schritte werden wiederholt; fertige kompatible Ergebnisse
+müssen nicht erneut kompiliert werden. Ein anderer Commit braucht eine neue
+Quellenzuordnung und frische Tests.
 
-Windows-Beispiel mit acht Compilerjobs:
+Weitere Buildrechner benötigen eigene vorbereitete gclient-Workspaces, SDKs
+und Toolchains. Ausgaben mit absoluten Pfaden sind kein allgemein portabler
+Cache. Höhere Jobzahlen lassen sich per CLI, Umgebungswert oder VS-Code-Eingabe
+wählen. Automatische Remoteausführung, CI-Runner und Infrastrukturkäufe werden
+nicht eingerichtet.
 
-```powershell
-.\aimium\tools\python.cmd aimium\tools\build.py check --target win-x64 --browser-tests --out-dir out/Aimium/win-x64-ninja
-if ($LASTEXITCODE -ne 0) { throw 'Resolve the reported prerequisites first.' }
-.\aimium\tools\python.cmd aimium\tools\build.py build --target win-x64 --browser-tests --jobs 8 --out-dir out/Aimium/win-x64-ninja --dry-run
-if ($LASTEXITCODE -ne 0) { throw 'Build plan failed.' }
-.\aimium\tools\python.cmd aimium\tools\build.py build --target win-x64 --browser-tests --jobs 8 --out-dir out/Aimium/win-x64-ninja
-if ($LASTEXITCODE -ne 0) { throw 'Build or smoke tests failed; inspect the receipt.' }
-```
-
-Auf Linux/macOS `python3` und das passende native Ziel verwenden.
-Nach einem nicht erfolgreichen Vorcheck oder Dry-run nicht weiterbauen.
-
-Ein echter Build verlangt einen sauberen, committeten Quellstand und zeichnet
-dessen Identität auf. Er überschreibt keine widersprüchlichen vorhandenen
-`args.gn`. Das Werkzeug synchronisiert keine Abhängigkeiten, installiert keine
-Voraussetzungen, wechselt keinen Branch und committet oder setzt nichts zurück.
-
-Der Abhängigkeitsvorcheck prüft reale Installationsverzeichnisse.
-`.gclient_entries` kann GCS-/CIPD-Einträge als `destination:object-or-package`
-enthalten; ihr Suffix ist kein Dateipfad. Mehrere Einträge können ein Ziel teilen.
-Der Vorcheck ersetzt weder gclients Downloadintegritätsprüfung noch die
-Kompatibilitätsprüfung durch GN und Compiler.
-
-Bei flachen Checkouts muss die erforderliche Upstream-Abstammung für die
-Versionswerkzeuge vorhanden sein. `build/util/lastchange.py --json` muss echte
-Upstream-Metadaten statt einer erfundenen Version ermitteln können.
-Keine `LASTCHANGE`-Daten fälschen und keinen Produktquellstand ändern, um
-fehlende Metadaten zu verdecken.
-
-## Ninja-Ausgabe inkrementell verwenden
-
-Windows verwendet laut [targets.json](../build/targets.json)
-`use_siso=false` und `use_remoteexec=false`, also lokalen Ninja-Betrieb.
-Für Windows ausdrücklich `--out-dir out/Aimium/win-x64-ninja` verwenden.
-Andere Ziele behalten ihre jeweiligen Ausführungsstandards; die Windowswahl
-belegt keine erfolgreiche Prüfung der anderen Plattformen.
-
-Ein kompatibler bestehender Ninja-Outdir bleibt erhalten. Nach einem Abbruch
-können gültige Objekte wiederverwendet werden; Ninja baut fehlende oder durch
-Abhängigkeiten veraltete Arbeit neu. Eine Änderung von `--jobs` betrifft die
-Parallelität und löscht keine gültigen Objekte.
-
-Wiederverwendung setzt kompatible Source-/DEPS-Stände, Toolchain und GN-Argumente
-voraus. Plattformen, Architekturen, inkompatible Einstellungen sowie Siso- und
-Ninja-Zustand brauchen getrennte Ausgaben. Einen passenden vorhandenen Outdir
-nicht allein zum Fortsetzen löschen oder durch einen neuen Cache ersetzen.
-Ein Cachetreffer ist kein Testergebnis und garantiert keine bestimmte Restdauer.
+`.gclient_entries` wird als Daten gelesen, nicht ausgeführt.
+Virtuelle Einträge `destination:object-or-package` werden ihren echten
+Installationsverzeichnissen zugeordnet. Der Vorcheck ersetzt weder gclients
+Integritätsprüfung noch die GN-/Compiler-Kompatibilitätsprüfung.
+Versionswerkzeuge brauchen echte Upstream-Metadaten; keine erfundenen
+`LASTCHANGE`-Daten erzeugen.
 
 ## Native Tests und normale Navigation
 
@@ -188,7 +160,7 @@ Befehle und Ergebnis sowie getrennt `native_tests` fest.
 Smoke-Test. Ein unterbrochener Build bleibt ohne vollständigen Abnahmenachweis.
 
 Der erwartete Windows-Browser liegt unter
-`out/Aimium/win-x64-ninja/chrome.exe`. Seine Existenz allein reicht nicht.
+`out/Aimium/win-x64-dev/chrome.exe`. Seine Existenz allein reicht nicht.
 Nach einem erfolgreichen Build sind normaler Start und Navigation gesondert
 mit einem neuen, getrennten Entwicklungsprofil und kontrollierten lokalen
 HTTP-Fixtures zu prüfen. Persönliche Browserprofile oder Konten nicht verwenden.

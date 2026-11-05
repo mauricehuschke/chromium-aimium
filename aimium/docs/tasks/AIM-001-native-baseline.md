@@ -9,8 +9,9 @@ ausgeführten Browserbuild. Der native Vollnachweis ist noch offen; unterbrochen
 Kompilierung liefert keine Freigabe von AIM-002 oder AIM-003.
 
 Prüfungen und Builds erfolgen lokal; GitHub Actions sind deaktiviert.
-Ausschließlich der Nutzer startet native Builds aus VS Code. Agenten starten
-oder wiederholen keine nativen Builds, GN-Generierung, Compiler oder Linker.
+Ausschließlich der Nutzer startet native Builds aus VS Code oder einem Terminal.
+Agenten starten oder wiederholen keine nativen Builds, GN-Generierung, Compiler
+oder Linker.
 Vorhandene kompatible Ninja-Ergebnisse bleiben für inkrementelle Wiederverwendung
 erhalten.
 
@@ -83,8 +84,10 @@ P0 ist erst mit den vereinbarten nativen Plattformnachweisen abgenommen.
 ## Befehlsgrundlage
 
 Die [VS-Code-Aufgaben](../../../.vscode/tasks.json) sind der vorgesehene Einstieg.
-Standard: **Aimium: Build + Smoke (lokal)** mit Strg+Umschalt+B
-(macOS: Cmd+Umschalt+B). Weitere Aufgaben sind
+Standard: **Aimium: Browser bauen (lokal)** mit Strg+Umschalt+B
+(macOS: Cmd+Umschalt+B), Profil `dev`, zwölf Jobs. Diese tägliche Aufgabe
+liefert keinen Smoke-Nachweis. Für dieses Ticket ausdrücklich
+**Aimium: Build + Smoke (lokal)** wählen. Weitere Aufgaben sind
 **Aimium: Voraussetzungen prüfen**, **Aimium: Buildplan prüfen**,
 **Aimium: Python-Tests (lokal)** und **Aimium: Vertragsbeispiele (lokal)**.
 
@@ -99,9 +102,9 @@ python3 aimium/tools/build.py plan --target linux-x64
 Für den Nutzer im integrierten VS-Code-Terminal des vollständigen Windows-Quellroots:
 
 ```powershell
-.\aimium\tools\python.cmd aimium\tools\build.py check --target win-x64 --browser-tests --out-dir out/Aimium/win-x64-ninja
-.\aimium\tools\python.cmd aimium\tools\build.py build --target win-x64 --browser-tests --jobs 8 --out-dir out/Aimium/win-x64-ninja --dry-run
-.\aimium\tools\python.cmd aimium\tools\build.py build --target win-x64 --browser-tests --jobs 8 --out-dir out/Aimium/win-x64-ninja
+.\aimium\tools\python.cmd aimium\tools\build.py check --target win-x64 --profile dev --browser-tests
+.\aimium\tools\python.cmd aimium\tools\build.py build --target win-x64 --profile dev --browser-tests --jobs 12 --dry-run
+.\aimium\tools\python.cmd aimium\tools\build.py build --target win-x64 --profile dev --browser-tests --jobs 12
 ```
 
 Nach einem fehlgeschlagenen Vorcheck oder Dry-run nicht weiterbauen. Die echte
@@ -111,7 +114,11 @@ Buildzeile ist ausschließlich nutzerseitig auszuführen. Auf Linux/macOS
 
 Der Build verlangt einen sauberen, committeten Quellstand. Bei kompatibler
 Source-/DEPS-/Toolchain- und GN-Konfiguration denselben Ninja-Outdir
-weiterverwenden. Eine Änderung von `--jobs` löscht gültige Ergebnisse nicht;
+weiterverwenden. `dev` und `optimized` verwenden getrennte Ausgaben; der erste
+Profilwechsel braucht viele neue Objekte und zusätzlichen Platz. Das alte
+Windows-Profil bleibt mit `--profile optimized` unter
+`out/Aimium/win-x64-ninja` erreichbar. Die neuen Profile sind noch nicht nativ
+abgenommen. Eine Änderung von `--jobs` löscht gültige Ergebnisse nicht;
 Siso- und Ninja-Ausgaben dürfen nicht vermischt werden.
 
 ## Nicht enthalten und Blockerregel

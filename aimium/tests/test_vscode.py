@@ -17,7 +17,7 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 class VSCodeTaskTest(unittest.TestCase):
-    def test_default_build_is_manual_and_preserves_windows_ninja_output(self):
+    def test_default_build_is_manual_browser_only_with_portable_profile_inputs(self):
         config = json.loads((REPO / ".vscode/tasks.json").read_text(encoding="utf-8"))
         builds = [task for task in config["tasks"]
                   if isinstance(task.get("group"), dict)
@@ -27,9 +27,21 @@ class VSCodeTaskTest(unittest.TestCase):
         task = builds[0]
         arguments = task["windows"]["args"]
         self.assertEqual("win-x64", arguments[arguments.index("--target") + 1])
-        self.assertEqual("out/Aimium/win-x64-ninja",
-                         arguments[arguments.index("--out-dir") + 1])
-        self.assertIn("--browser-tests", arguments)
+        self.assertEqual("${input:aimiumProfile}", arguments[arguments.index("--profile") + 1])
+        self.assertNotIn("--out-dir", arguments)
+        self.assertNotIn("--browser-tests", arguments)
+        inputs = {item["id"]: item for item in config["inputs"]}
+        self.assertEqual("dev", inputs["aimiumProfile"]["default"])
+        self.assertEqual("12", inputs["aimiumJobs"]["default"])
+        self.assertEqual("promptString", inputs["aimiumJobs"]["type"])
+        smoke = next(item for item in config["tasks"] if item["label"] == "Aimium: Build + Smoke (lokal)")
+        for platform_args in (smoke["args"], smoke["windows"]["args"], smoke["osx"]["args"]):
+            self.assertIn("--browser-tests", platform_args)
+            self.assertIn("--min-free-gib", platform_args)
+        legacy = next(item for item in config["tasks"] if "Optimierten" in item["label"])
+        legacy_args = legacy["windows"]["args"]
+        self.assertEqual("optimized", legacy_args[legacy_args.index("--profile") + 1])
+        self.assertNotIn("--out-dir", legacy_args)
         self.assertEqual(1, task["runOptions"]["instanceLimit"])
         for configured in config["tasks"]:
             self.assertNotEqual("folderOpen", configured.get("runOptions", {}).get("runOn"))
